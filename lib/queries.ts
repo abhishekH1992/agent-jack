@@ -118,6 +118,12 @@ export const PAGES_QUERY = `
   }
 `;
 
+export const PAGE_QUERY = `
+  query Page($id: ID!) {
+    page(id: $id) { ${PAGE_FIELDS} }
+  }
+`;
+
 export const PAGE_BY_SLUG = `
   query PageBySlug($slug: String!) {
     pageBySlug(slug: $slug) { ${PAGE_FIELDS} }
