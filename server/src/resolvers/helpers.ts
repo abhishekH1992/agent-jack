@@ -9,6 +9,7 @@ export function dec(v: Prisma.Decimal | number | null | undefined): number | nul
 export function mapMenu(menu: any) {
   return {
     ...menu,
+    description: menu.description ?? null,
     fixedPrice: Number(menu.fixedPrice),
     lowestPrice: dec(menu.lowestPrice),
     highestPrice: dec(menu.highestPrice),
@@ -16,6 +17,32 @@ export function mapMenu(menu: any) {
     currentPrice: dec(menu.currentPrice),
     addons: menu.addons?.map((a: any) => ({ ...a, price: Number(a.price) })),
     variants: menu.variants?.map((v: any) => ({ ...v, price: Number(v.price) })),
+  };
+}
+
+/** Scalar fields only — avoids Prisma rejecting unknown GraphQL keys. */
+export function menuWriteData(input: any) {
+  return {
+    name: String(input.name || "").trim(),
+    description:
+      input.description == null || input.description === ""
+        ? null
+        : String(input.description),
+    image: input.image == null || input.image === "" ? null : String(input.image),
+    fixedPrice: Number(input.fixedPrice),
+    lowestPrice: input.lowestPrice == null ? null : Number(input.lowestPrice),
+    highestPrice: input.highestPrice == null ? null : Number(input.highestPrice),
+    step: input.step == null ? null : Number(input.step),
+    currentPrice:
+      input.currentPrice == null
+        ? Number(input.fixedPrice)
+        : Number(input.currentPrice),
+    pricingEnabled: Boolean(input.pricingEnabled),
+    isEnable: input.isEnable !== false,
+    tags: Array.isArray(input.tags)
+      ? input.tags.map((t: unknown) => String(t))
+      : [],
+    subCategoryId: String(input.subCategoryId),
   };
 }
 

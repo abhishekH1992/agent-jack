@@ -69,11 +69,18 @@ export default function AdminMenusPage() {
         (c.subCategories || []).map((s: any) => ({
           id: s.id,
           categoryId: c.id,
+          categoryType: (c.categoryType?.name || "").toLowerCase(),
           label: `${c.name} · ${s.name}`,
         })),
       ),
     [categories],
   );
+
+  const selectedSub = useMemo(
+    () => subOptions.find((s) => s.id === form.subCategoryId) || null,
+    [subOptions, form.subCategoryId],
+  );
+  const isLiquorCategory = selectedSub?.categoryType === "liquor";
 
   const filterSubOptions = useMemo(() => {
     if (!filterCategoryId) return subOptions;
@@ -165,25 +172,40 @@ export default function AdminMenusPage() {
       return toast.error("Fixed price must be a number");
     }
 
+    const liquor =
+      (
+        subOptions.find((s) => s.id === form.subCategoryId)?.categoryType || ""
+      ) === "liquor";
+
     setBusy(true);
     try {
       const input = {
         name: form.name.trim(),
-        description: form.description.trim() || null,
+        description: form.description.trim(),
         image: form.image.trim() || null,
         fixedPrice,
-        lowestPrice: numOrNull(form.lowestPrice),
-        highestPrice: numOrNull(form.highestPrice),
-        step: numOrNull(form.step),
-        currentPrice: numOrNull(form.currentPrice) ?? fixedPrice,
-        pricingEnabled: form.pricingEnabled,
+        lowestPrice: liquor ? numOrNull(form.lowestPrice) : null,
+        highestPrice: liquor ? numOrNull(form.highestPrice) : null,
+        step: liquor ? numOrNull(form.step) : null,
+        currentPrice: liquor
+          ? (numOrNull(form.currentPrice) ?? fixedPrice)
+          : fixedPrice,
+        pricingEnabled: liquor ? form.pricingEnabled : false,
         isEnable: form.isEnable,
         tags: form.tags,
         subCategoryId: form.subCategoryId,
       };
       if (editingId) {
-        await adminGql(UPDATE_MENU, { id: editingId, input });
+        const data = await adminGql<{ updateMenu: { description?: string | null } }>(
+          UPDATE_MENU,
+          { id: editingId, input },
+        );
         toast.success("Menu updated");
+        // Keep form in sync with what the API actually saved
+        setForm((f) => ({
+          ...f,
+          description: data.updateMenu.description || "",
+        }));
       } else {
         await adminGql(STORE_MENU, { input });
         toast.success("Menu created");
@@ -232,8 +254,8 @@ export default function AdminMenusPage() {
         </button>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[1fr_1.15fr]">
-        <div className="space-y-3">
+      <div className="grid min-w-0 gap-4 lg:grid-cols-[1fr_1.15fr]">
+        <div className="min-w-0 space-y-3">
           <div className="grid gap-2 sm:grid-cols-2">
             <select
               className="input"
@@ -285,27 +307,30 @@ export default function AdminMenusPage() {
             {list.pageItems.map((menu) => (
               <div
                 key={menu.id}
-                className="surface-card flex flex-wrap items-center justify-between gap-3 rounded-2xl p-4"
+                className="surface-card flex items-start gap-3 overflow-hidden rounded-2xl p-4"
               >
-                <div className="flex min-w-0 items-center gap-3">
-                  {menu.image ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={menu.image}
-                      alt=""
-                      className="h-12 w-12 shrink-0 rounded-lg object-cover"
-                    />
+                {menu.image ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={menu.image}
+                    alt=""
+                    className="h-12 w-12 shrink-0 rounded-lg object-cover"
+                  />
+                ) : null}
+                <div className="min-w-0 flex-1 overflow-hidden">
+                  <div className="truncate font-semibold">{menu.name}</div>
+                  {menu.description ? (
+                    <p className="mt-0.5 line-clamp-2 break-words text-xs text-[var(--ink)]/80">
+                      {menu.description}
+                    </p>
                   ) : null}
-                  <div className="min-w-0">
-                    <div className="font-semibold">{menu.name}</div>
-                    <div className="text-xs text-[var(--muted)]">
-                      {menu.path} · {money(Number(menu.fixedPrice || 0))}
-                      {menu.pricingEnabled ? " · Live bid" : ""}
-                      {!menu.isEnable ? " · Hidden" : ""}
-                    </div>
+                  <div className="mt-0.5 truncate text-xs text-[var(--muted)]">
+                    {menu.path} · {money(Number(menu.fixedPrice || 0))}
+                    {menu.pricingEnabled ? " · Live bid" : ""}
+                    {!menu.isEnable ? " · Hidden" : ""}
                   </div>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex shrink-0 gap-2">
                   <button
                     type="button"
                     className="btn btn-secondary !px-3 !py-2 text-sm"
@@ -332,7 +357,7 @@ export default function AdminMenusPage() {
           />
         </div>
 
-        <div className="surface-card space-y-3 rounded-2xl p-5">
+        <div className="surface-card min-w-0 space-y-3 overflow-hidden rounded-2xl p-5">
           <h2 className="font-bold">
             {editingId ? "Edit menu" : "Create menu"}
           </h2>
@@ -344,7 +369,9 @@ export default function AdminMenusPage() {
             <input
               className="input"
               value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, name: e.target.value }))
+              }
             />
           </label>
 
@@ -356,7 +383,7 @@ export default function AdminMenusPage() {
               className="input"
               value={form.subCategoryId}
               onChange={(e) =>
-                setForm({ ...form, subCategoryId: e.target.value })
+                setForm((f) => ({ ...f, subCategoryId: e.target.value }))
               }
             >
               <option value="">Select subcategory</option>
@@ -372,18 +399,21 @@ export default function AdminMenusPage() {
             <span className="text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
               Description
             </span>
-            <textarea
-              className="input min-h-20 resize-y py-3"
-              value={form.description}
-              onChange={(e) =>
-                setForm({ ...form, description: e.target.value })
-              }
-            />
+            <div className="h-28 overflow-hidden rounded-[var(--radius-md)] border border-[var(--line)] bg-[var(--surface)] focus-within:border-[var(--brand)] focus-within:ring-4 focus-within:ring-[rgba(234,88,12,0.2)]">
+              <textarea
+                className="block h-full w-full resize-none overflow-y-auto border-0 bg-transparent px-4 py-3 text-base text-[var(--ink)] outline-none [scrollbar-width:thin]"
+                value={form.description}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, description: e.target.value }))
+                }
+                placeholder="Short description shown on the menu card and add popup"
+              />
+            </div>
           </label>
 
           <ImageUploadField
             value={form.image}
-            onChange={(image) => setForm({ ...form, image })}
+            onChange={(image) => setForm((f) => ({ ...f, image }))}
           />
 
           <div className="grid grid-cols-2 gap-3">
@@ -396,85 +426,93 @@ export default function AdminMenusPage() {
                 inputMode="decimal"
                 value={form.fixedPrice}
                 onChange={(e) =>
-                  setForm({ ...form, fixedPrice: e.target.value })
+                  setForm((f) => ({ ...f, fixedPrice: e.target.value }))
                 }
               />
             </label>
-            <label className="block space-y-1">
-              <span className="text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
-                Current price
-              </span>
-              <input
-                className="input"
-                inputMode="decimal"
-                value={form.currentPrice}
-                onChange={(e) =>
-                  setForm({ ...form, currentPrice: e.target.value })
-                }
-              />
-            </label>
-            <label className="block space-y-1">
-              <span className="text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
-                Lowest
-              </span>
-              <input
-                className="input"
-                inputMode="decimal"
-                value={form.lowestPrice}
-                onChange={(e) =>
-                  setForm({ ...form, lowestPrice: e.target.value })
-                }
-              />
-            </label>
-            <label className="block space-y-1">
-              <span className="text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
-                Highest
-              </span>
-              <input
-                className="input"
-                inputMode="decimal"
-                value={form.highestPrice}
-                onChange={(e) =>
-                  setForm({ ...form, highestPrice: e.target.value })
-                }
-              />
-            </label>
-            <label className="block space-y-1">
-              <span className="text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
-                Bid step
-              </span>
-              <input
-                className="input"
-                inputMode="decimal"
-                value={form.step}
-                onChange={(e) => setForm({ ...form, step: e.target.value })}
-              />
-            </label>
+            {isLiquorCategory ? (
+              <>
+                <label className="block space-y-1">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
+                    Current price
+                  </span>
+                  <input
+                    className="input"
+                    inputMode="decimal"
+                    value={form.currentPrice}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, currentPrice: e.target.value }))
+                    }
+                  />
+                </label>
+                <label className="block space-y-1">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
+                    Lowest
+                  </span>
+                  <input
+                    className="input"
+                    inputMode="decimal"
+                    value={form.lowestPrice}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, lowestPrice: e.target.value }))
+                    }
+                  />
+                </label>
+                <label className="block space-y-1">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
+                    Highest
+                  </span>
+                  <input
+                    className="input"
+                    inputMode="decimal"
+                    value={form.highestPrice}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, highestPrice: e.target.value }))
+                    }
+                  />
+                </label>
+                <label className="block space-y-1">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
+                    Bid step
+                  </span>
+                  <input
+                    className="input"
+                    inputMode="decimal"
+                    value={form.step}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, step: e.target.value }))
+                    }
+                  />
+                </label>
+              </>
+            ) : null}
           </div>
 
           <TagInput
             value={form.tags}
-            onChange={(tags) => setForm({ ...form, tags })}
+            onChange={(tags) => setForm((f) => ({ ...f, tags }))}
           />
 
-          <label className="flex min-h-11 cursor-pointer items-center gap-3">
-            <input
-              type="checkbox"
-              checked={form.pricingEnabled}
-              onChange={(e) =>
-                setForm({ ...form, pricingEnabled: e.target.checked })
-              }
-              className="h-4 w-4 accent-[var(--brand)]"
-            />
-            <span className="text-sm font-medium">Live bidding enabled</span>
-          </label>
+          {isLiquorCategory ? (
+            <label className="flex min-h-11 cursor-pointer items-center gap-3">
+              <input
+                type="checkbox"
+                checked={form.pricingEnabled}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, pricingEnabled: e.target.checked }))
+                }
+                className="h-4 w-4 accent-[var(--brand)]"
+              />
+              <span className="text-sm font-medium">Live bidding enabled</span>
+            </label>
+          ) : null}
 
           <label className="flex min-h-11 cursor-pointer items-center gap-3">
             <input
               type="checkbox"
               checked={form.isEnable}
               onChange={(e) =>
-                setForm({ ...form, isEnable: e.target.checked })
+                setForm((f) => ({ ...f, isEnable: e.target.checked }))
               }
               className="h-4 w-4 accent-[var(--brand)]"
             />

@@ -176,6 +176,7 @@ export function MenuBrowseClient({
   function openMenu(menu: MenuItem) {
     const normalized = {
       ...menu,
+      image: menu.image || null,
       variants: menu.variants || [],
       addons: menu.addons || [],
       pricingEnabled: Boolean(menu.pricingEnabled),

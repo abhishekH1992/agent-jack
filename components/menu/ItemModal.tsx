@@ -7,6 +7,7 @@ import { ensureCart, money } from "@/lib/cart";
 import { gql } from "@/lib/graphql";
 import { ADD_CART_ITEM } from "@/lib/queries";
 import { useCart } from "@/components/cart/CartProvider";
+import { ExpandableDescription } from "@/components/menu/ExpandableDescription";
 
 type Variant = { id: string; name: string; price: number };
 type Addon = { id: string; name: string; price: number };
@@ -15,6 +16,7 @@ export type ModalMenu = {
   id: string;
   name: string;
   description?: string | null;
+  image?: string | null;
   fixedPrice: number;
   currentPrice?: number | null;
   lowestPrice?: number | null;
@@ -115,10 +117,24 @@ export function ItemModal({
               <Modal.Heading className="font-display text-xl font-bold">
                 {menu.name}
               </Modal.Heading>
-              <p className="text-sm text-[var(--muted)]">{menu.description}</p>
               <Modal.CloseTrigger className="absolute right-2 top-2 min-h-11 min-w-11" />
             </Modal.Header>
             <Modal.Body className="space-y-4 py-4">
+              {menu.image ? (
+                <div className="relative aspect-[16/10] overflow-hidden rounded-xl bg-[var(--brand-soft)]">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={menu.image}
+                    alt={menu.name}
+                    className="absolute inset-0 h-full w-full object-cover"
+                  />
+                </div>
+              ) : null}
+
+              {menu.description ? (
+                <ExpandableDescription text={menu.description} lines={3} />
+              ) : null}
+
               {menu.variants.length > 0 && (
                 <div>
                   <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">

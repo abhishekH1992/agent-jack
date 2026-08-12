@@ -12,6 +12,7 @@ export function HomeClient({ belts }: { belts: any[] }) {
   function openMenu(menu: ModalMenu | any) {
     const normalized = {
       ...menu,
+      image: menu.image || null,
       variants: menu.variants || [],
       addons: menu.addons || [],
       pricingEnabled: Boolean(menu.pricingEnabled),

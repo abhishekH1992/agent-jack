@@ -13,6 +13,7 @@ import {
   mapMenu,
   mapPage,
   menuInclude,
+  menuWriteData,
   pageInclude,
   persistBelt,
   persistPage,
@@ -598,10 +599,7 @@ export const resolvers = {
     storeMenu: async (_: unknown, { input }: { input: any }, ctx: GraphQLContext) => {
       requireAdmin(ctx);
       const menu = await prisma.menu.create({
-        data: {
-          ...input,
-          currentPrice: input.currentPrice ?? input.fixedPrice,
-        },
+        data: menuWriteData(input),
         include: menuInclude,
       });
       return mapMenu(menu);
@@ -614,7 +612,7 @@ export const resolvers = {
       requireAdmin(ctx);
       const menu = await prisma.menu.update({
         where: { id },
-        data: input,
+        data: menuWriteData(input),
         include: menuInclude,
       });
       return mapMenu(menu);

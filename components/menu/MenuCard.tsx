@@ -2,6 +2,7 @@
 
 import { Button, Card } from "@heroui/react";
 import { money } from "@/lib/cart";
+import { ExpandableDescription } from "@/components/menu/ExpandableDescription";
 
 export type MenuCardData = {
   id: string;
@@ -65,11 +66,9 @@ export function MenuCard({
               </span>
             )}
           </div>
-          {menu.description && (
-            <p className="line-clamp-2 text-sm text-[var(--muted)]">
-              {menu.description}
-            </p>
-          )}
+          {menu.description ? (
+            <ExpandableDescription text={menu.description} lines={3} />
+          ) : null}
         </Card.Content>
       </div>
       <div className="px-4 pb-4">

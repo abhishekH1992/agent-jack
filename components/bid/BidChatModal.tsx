@@ -2,14 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Button, Modal, Spinner, useOverlayState } from "@heroui/react";
-import { io } from "socket.io-client";
 import toast from "react-hot-toast";
-import { API_URL } from "@/lib/config";
-import {
-  ensureCart,
-  getBidSessionId,
-  money,
-} from "@/lib/cart";
+import { ensureCart, getBidSessionId } from "@/lib/cart";
 import { gql } from "@/lib/graphql";
 import { DELETE_CART_ITEM, PLACE_BID } from "@/lib/queries";
 import { useCart } from "@/components/cart/CartProvider";
@@ -26,8 +20,8 @@ export type BidMenu = {
 
 type Msg = { role: "user" | "assistant"; content: string };
 
-function opener(name: string, price: number) {
-  return `Hey legend — ${name} is live at ${money(price)}. Nudge that bid up and let’s see if the room’s thirsty tonight.`;
+function opener(name: string) {
+  return `Hey legend — ${name} is up for grabs. Put a bid on the bar and we’ll see if the room’s thirsty tonight.`;
 }
 
 export function BidChatModal({
@@ -48,7 +42,6 @@ export function BidChatModal({
   });
 
   const [placement, setPlacement] = useState<"bottom" | "center">("bottom");
-  const [price, setPrice] = useState(0);
   const [amount, setAmount] = useState(0);
   const [messages, setMessages] = useState<Msg[]>([]);
   const [busy, setBusy] = useState(false);
@@ -69,27 +62,18 @@ export function BidChatModal({
 
   useEffect(() => {
     if (!menu || !isOpen) return;
-    const live = Number(menu.currentPrice ?? menu.fixedPrice);
-    setPrice(live);
-    setAmount(Number(live.toFixed(2)));
+    // Start bid near mid-range so live current price is not revealed
+    const start = Number(
+      (
+        (Number(menu.lowestPrice ?? menu.fixedPrice) +
+          Number(menu.highestPrice ?? menu.fixedPrice)) /
+        2
+      ).toFixed(2),
+    );
+    setAmount(start);
     setDealReady(false);
     setPendingCartItemId(null);
-    setMessages([{ role: "assistant", content: opener(menu.name, live) }]);
-  }, [menu, isOpen]);
-
-  useEffect(() => {
-    if (!menu || !isOpen) return;
-    const socket = io(API_URL, { transports: ["websocket", "polling"] });
-    socket.emit("join:menu", menu.id);
-    socket.on(
-      "price:update",
-      (payload: { menuId: string; currentPrice: number }) => {
-        if (payload.menuId === menu.id) setPrice(payload.currentPrice);
-      },
-    );
-    return () => {
-      socket.disconnect();
-    };
+    setMessages([{ role: "assistant", content: opener(menu.name) }]);
   }, [menu, isOpen]);
 
   const amountLabel = useMemo(() => amount.toFixed(2), [amount]);
@@ -135,7 +119,6 @@ export function BidChatModal({
         sessionId: getBidSessionId(),
       });
 
-      setPrice(data.placeBid.currentPrice);
       setMessages((m) => [
         ...m,
         { role: "assistant", content: data.placeBid.message },
@@ -185,7 +168,7 @@ export function BidChatModal({
       },
       {
         role: "assistant",
-        content: `No stress — ${menu?.name} is still at ${money(price)}. Take another shot when you’re ready.`,
+        content: `No stress — ${menu?.name} is still in play. Take another shot when you’re ready.`,
       },
     ]);
   }
@@ -206,14 +189,9 @@ export function BidChatModal({
               <Modal.Heading className="font-display text-xl font-bold">
                 {menu.name}
               </Modal.Heading>
-              <div className="flex w-full flex-wrap items-center justify-between gap-2 text-xs text-[var(--muted)]">
-                <span>
-                  Min: NZD {min.toFixed(2)} · Max: NZD {max.toFixed(2)}
-                </span>
-                <span className="rounded-full bg-[var(--brand)] px-2.5 py-1 font-semibold text-white">
-                  Live {money(price)}
-                </span>
-              </div>
+              <p className="text-xs text-[var(--muted)]">
+                Min: NZD {min.toFixed(2)} · Max: NZD {max.toFixed(2)}
+              </p>
               <Modal.CloseTrigger className="absolute right-2 top-2 min-h-11 min-w-11" />
             </Modal.Header>
 

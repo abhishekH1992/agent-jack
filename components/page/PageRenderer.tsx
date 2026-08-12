@@ -57,6 +57,7 @@ export function PageRenderer({
   function openMenu(menu: any) {
     const normalized = {
       ...menu,
+      image: menu.image || null,
       variants: menu.variants || [],
       addons: menu.addons || [],
       pricingEnabled: Boolean(menu.pricingEnabled),

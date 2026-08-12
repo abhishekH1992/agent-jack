@@ -31,18 +31,35 @@ function MenuBrowseBlockInner({ config }: { config: MenuBrowseConfig }) {
 
   useEffect(() => {
     let cancelled = false;
-    gql<{ categories: any[] }>(CATEGORIES_QUERY)
-      .then((data) => {
-        if (!cancelled) setCategories(data.categories || []);
-      })
-      .catch((err) => {
+
+    async function load() {
+      try {
+        const data = await gql<{ categories: any[] }>(CATEGORIES_QUERY);
+        if (!cancelled) {
+          setCategories(data.categories || []);
+          setError("");
+        }
+      } catch (err: any) {
         if (!cancelled) {
           setError(err?.message || "Failed to load menu");
           setCategories([]);
         }
-      });
+      }
+    }
+
+    void load();
+
+    // Refresh when returning from admin so description/price edits show up
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void load();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
+
     return () => {
       cancelled = true;
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
     };
   }, []);
 
