@@ -7,6 +7,7 @@ export type MenuCardData = {
   id: string;
   name: string;
   description?: string | null;
+  image?: string | null;
   fixedPrice: number;
   currentPrice?: number | null;
   pricingEnabled: boolean;
@@ -24,12 +25,22 @@ export function MenuCard({
     <Card className="surface-card overflow-hidden border-none transition duration-200 active:scale-[0.99] sm:hover:-translate-y-0.5">
       <div className="cursor-pointer text-left" onClick={onClick}>
         <div
-          className={`relative h-24 sm:h-28 ${
-            menu.pricingEnabled
-              ? "block-accent"
-              : "bg-[linear-gradient(135deg,#ffedd5,#fdba74_45%,#fff7ed)]"
+          className={`relative h-36 overflow-hidden sm:h-40 ${
+            menu.image
+              ? "bg-[var(--brand-soft)]"
+              : menu.pricingEnabled
+                ? "block-accent"
+                : "bg-[linear-gradient(135deg,#ffedd5,#fdba74_45%,#fff7ed)]"
           }`}
         >
+          {menu.image ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={menu.image}
+              alt={menu.name}
+              className="absolute inset-0 h-full w-full object-cover"
+            />
+          ) : null}
           <div className="absolute bottom-3 left-3">
             <span
               className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${

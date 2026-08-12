@@ -406,18 +406,30 @@ export const resolvers = {
       _: unknown,
       args: { clerkId: string; email?: string; name?: string; role?: string },
     ) => {
+      const email = args.email?.trim() || null;
+      const name = args.name?.trim() || null;
+      const existing = await prisma.user.findUnique({
+        where: { clerkId: args.clerkId },
+      });
+      // Never trust client-provided role elevation; only seed admin email is promoted.
+      const role =
+        existing?.role === "admin" ||
+        email?.toLowerCase() === "admin@example.com"
+          ? "admin"
+          : "customer";
+
       return prisma.user.upsert({
         where: { clerkId: args.clerkId },
         update: {
-          email: args.email,
-          name: args.name,
-          role: args.role,
+          ...(email ? { email } : {}),
+          ...(name ? { name } : {}),
+          role,
         },
         create: {
           clerkId: args.clerkId,
-          email: args.email,
-          name: args.name,
-          role: args.role || "customer",
+          email: email || undefined,
+          name: name || undefined,
+          role,
         },
       });
     },

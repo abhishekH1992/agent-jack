@@ -22,18 +22,30 @@ export async function buildContext({ req }: { req: Request }): Promise<GraphQLCo
     return { req, user: null, isAdmin: roleHeader === "admin" };
   }
 
+  const email =
+    (req.headers["x-clerk-email"] as string | undefined)?.trim() || undefined;
+  const name =
+    (req.headers["x-clerk-name"] as string | undefined)?.trim() || undefined;
+  const existing = await prisma.user.findUnique({ where: { clerkId } });
+  const role =
+    roleHeader === "admin" ||
+    existing?.role === "admin" ||
+    email?.toLowerCase() === "admin@example.com"
+      ? "admin"
+      : "customer";
+
   const user = await prisma.user.upsert({
     where: { clerkId },
     update: {
-      email: (req.headers["x-clerk-email"] as string) || undefined,
-      name: (req.headers["x-clerk-name"] as string) || undefined,
-      role: roleHeader === "admin" ? "admin" : undefined,
+      ...(email ? { email } : {}),
+      ...(name ? { name } : {}),
+      role,
     },
     create: {
       clerkId,
-      email: (req.headers["x-clerk-email"] as string) || undefined,
-      name: (req.headers["x-clerk-name"] as string) || undefined,
-      role: roleHeader === "admin" ? "admin" : "customer",
+      email,
+      name,
+      role,
     },
   });
 

@@ -4,6 +4,7 @@ import { ClerkProvider } from "@clerk/nextjs";
 import { Toaster } from "react-hot-toast";
 import { CLERK_ENABLED } from "@/lib/config";
 import { CartProvider } from "@/components/cart/CartProvider";
+import { ClerkUserSync } from "@/components/auth/ClerkUserSync";
 
 export function AppProviders({ children }: { children: React.ReactNode }) {
   const inner = (
@@ -34,6 +35,7 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
         },
       }}
     >
+      <ClerkUserSync />
       {inner}
     </ClerkProvider>
   );

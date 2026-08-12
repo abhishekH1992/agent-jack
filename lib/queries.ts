@@ -305,3 +305,11 @@ export const UPDATE_SITE = `
     updateSite(input: $input) { id name email logo banners }
   }
 `;
+
+export const UPSERT_ME = `
+  mutation UpsertMe($clerkId: String!, $email: String, $name: String) {
+    upsertMe(clerkId: $clerkId, email: $email, name: $name) {
+      id clerkId email name role
+    }
+  }
+`;
