@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import clsx from "clsx";
 import { HomeBanner } from "@/components/layout/HomeBanner";
 import { BeltSection } from "@/components/menu/BeltSection";
 import { ItemModal, ModalMenu } from "@/components/menu/ItemModal";
@@ -15,6 +16,7 @@ export type PageBlockData = {
   images: string[];
   imageLayout?: "SINGLE" | "COLUMN" | "SLIDER" | null;
   isBanner: boolean;
+  buttons?: Array<{ label: string; href: string; variant?: string }> | null;
   content?: string | null;
   belt?: {
     id: string;
@@ -30,6 +32,10 @@ export type PageData = {
   slug: string;
   blocks: PageBlockData[];
 };
+
+function isBannerBlock(block: PageBlockData) {
+  return block.type === "IMAGE" && block.isBanner;
+}
 
 export function PageRenderer({
   page,
@@ -59,9 +65,11 @@ export function PageRenderer({
     else setFoodMenu(normalized);
   }
 
+  const showPageTitle = showTitle && page.slug !== "home";
+
   return (
     <div className="pb-32">
-      {showTitle && page.slug !== "home" ? (
+      {showPageTitle ? (
         <div className="page-shell pt-6">
           <h1
             className="text-3xl md:text-4xl"
@@ -72,63 +80,69 @@ export function PageRenderer({
         </div>
       ) : null}
 
-      <div className="space-y-10 py-6 sm:space-y-12 sm:py-8">
-        {blocks.map((block) => {
-          if (block.type === "IMAGE") {
-            if (block.isBanner) {
-              return (
-                <HomeBanner
-                  key={block.id}
-                  banners={block.images || []}
-                  siteName={siteName}
-                />
-              );
-            }
-            return (
-              <div key={block.id} className="page-shell">
-                <ImageBlock
-                  images={block.images || []}
-                  layout={block.imageLayout || "SINGLE"}
-                />
-              </div>
-            );
-          }
+      {blocks.map((block, index) => {
+        const prev = blocks[index - 1];
+        const prevBanner = prev ? isBannerBlock(prev) : false;
+        const first = index === 0 && !showPageTitle;
 
-          if (block.type === "RICH_TEXT") {
-            return (
-              <div key={block.id} className="page-shell">
-                <div
-                  className="prose-page max-w-none text-[var(--ink)]"
-                  dangerouslySetInnerHTML={{
-                    __html: block.content || "<p></p>",
-                  }}
-                />
-              </div>
-            );
-          }
+        if (isBannerBlock(block)) {
+          return (
+            <div
+              key={block.id}
+              className={clsx(!first && "mt-10 sm:mt-12")}
+            >
+              <HomeBanner
+                banners={block.images || []}
+                siteName={siteName}
+                buttons={block.buttons || []}
+              />
+            </div>
+          );
+        }
 
-          if (block.type === "BELT" && block.belt) {
-            return (
-              <div key={block.id} className="page-shell">
-                <BeltSection
-                  name={block.belt.name}
-                  isSlider={Boolean(block.belt.isSlider)}
-                  menus={block.belt.menus || []}
-                  onSelect={openMenu}
-                />
-              </div>
-            );
-          }
+        return (
+          <div
+            key={block.id}
+            className={clsx(
+              "page-shell",
+              first || prevBanner || (index === 0 && showPageTitle)
+                ? "pt-6 sm:pt-8"
+                : "pt-10 sm:pt-12",
+            )}
+          >
+            {block.type === "IMAGE" ? (
+              <ImageBlock
+                images={block.images || []}
+                layout={block.imageLayout || "SINGLE"}
+              />
+            ) : null}
 
-          return null;
-        })}
+            {block.type === "RICH_TEXT" ? (
+              <div
+                className="prose-page max-w-none text-[var(--ink)]"
+                dangerouslySetInnerHTML={{
+                  __html: block.content || "<p></p>",
+                }}
+              />
+            ) : null}
 
-        {blocks.length === 0 ? (
-          <p className="page-shell text-sm text-[var(--muted)]">
-            This page has no content yet.
-          </p>
-        ) : null}
-      </div>
+            {block.type === "BELT" && block.belt ? (
+              <BeltSection
+                name={block.belt.name}
+                isSlider={Boolean(block.belt.isSlider)}
+                menus={block.belt.menus || []}
+                onSelect={openMenu}
+              />
+            ) : null}
+          </div>
+        );
+      })}
+
+      {blocks.length === 0 ? (
+        <p className="page-shell pt-6 text-sm text-[var(--muted)]">
+          This page has no content yet.
+        </p>
+      ) : null}
 
       <ItemModal
         menu={foodMenu}

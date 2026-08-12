@@ -152,6 +152,8 @@ model PageBlock {
   images      String[]       @default([])
   imageLayout ImageLayout?
   isBanner    Boolean        @default(false)
+  /// Banner / image CTAs: [{ label, href, variant: primary|secondary }]
+  buttons     Json           @default("[]")
   /// RICH_TEXT block (HTML)
   content     String?        @db.Text
   /// BELT block

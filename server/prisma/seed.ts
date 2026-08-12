@@ -533,6 +533,10 @@ async function main() {
             images: banners,
             imageLayout: "SLIDER",
             isBanner: true,
+            buttons: [
+              { label: "Browse menu", href: "/menu", variant: "primary" },
+              { label: "View cart", href: "/cart", variant: "secondary" },
+            ],
           },
           {
             type: "BELT",

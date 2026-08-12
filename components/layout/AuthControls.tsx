@@ -1,17 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { Button } from "@heroui/react";
 import { SignedIn, SignedOut, SignInButton, UserButton } from "@clerk/nextjs";
 import { CLERK_ENABLED } from "@/lib/config";
 
 export function AuthControls() {
   if (!CLERK_ENABLED) {
     return (
-      <Link href="/sign-in" className="cursor-pointer">
-        <Button className="min-h-11 bg-[var(--cta)] px-3 font-semibold text-white sm:px-4">
-          Sign in
-        </Button>
+      <Link
+        href="/sign-in"
+        className="btn btn-primary !min-h-11 !rounded-full !px-3 sm:!px-4"
+      >
+        Sign in
       </Link>
     );
   }
@@ -20,13 +20,18 @@ export function AuthControls() {
     <>
       <SignedOut>
         <SignInButton mode="modal">
-          <Button className="min-h-11 cursor-pointer bg-[var(--cta)] px-3 font-semibold text-white sm:px-4">
+          <button
+            type="button"
+            className="btn btn-primary !min-h-11 !rounded-full !px-3 sm:!px-4"
+          >
             Sign in
-          </Button>
+          </button>
         </SignInButton>
       </SignedOut>
       <SignedIn>
-        <UserButton afterSignOutUrl="/" />
+        <div className="flex min-h-11 min-w-11 items-center justify-center">
+          <UserButton afterSignOutUrl="/" />
+        </div>
       </SignedIn>
     </>
   );

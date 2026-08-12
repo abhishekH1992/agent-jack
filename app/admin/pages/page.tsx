@@ -32,6 +32,13 @@ import {
 type BlockType = "IMAGE" | "RICH_TEXT" | "BELT";
 type ImageLayout = "SINGLE" | "COLUMN" | "SLIDER";
 
+type BannerButtonForm = {
+  id: string;
+  label: string;
+  href: string;
+  variant: "primary" | "secondary";
+};
+
 type BlockForm = {
   id: string;
   type: BlockType;
@@ -40,6 +47,7 @@ type BlockForm = {
   images: string[];
   imageLayout: ImageLayout;
   isBanner: boolean;
+  buttons: BannerButtonForm[];
   content: string;
   beltId: string;
   belt: BeltSourceValue;
@@ -63,6 +71,7 @@ const emptyBlock = (
   images: [],
   imageLayout: "SINGLE",
   isBanner: false,
+  buttons: [],
   content: "",
   beltId: "",
   belt: emptyBeltSource(categories),
@@ -134,6 +143,12 @@ export default function AdminPagesPage() {
         images: b.images || [],
         imageLayout: (b.imageLayout || "SINGLE") as ImageLayout,
         isBanner: Boolean(b.isBanner),
+        buttons: (b.buttons || []).map((btn: any, bi: number) => ({
+          id: `btn-${b.id || i}-${bi}`,
+          label: btn.label || "",
+          href: btn.href || "",
+          variant: btn.variant === "secondary" ? "secondary" : "primary",
+        })),
         content: b.content || "",
         beltId: b.beltId || b.belt?.id || "",
         belt: b.belt
@@ -205,6 +220,16 @@ export default function AdminPagesPage() {
           images: b.type === "IMAGE" ? b.images : [],
           imageLayout: b.type === "IMAGE" ? b.imageLayout : null,
           isBanner: b.type === "IMAGE" ? b.isBanner : false,
+          buttons:
+            b.type === "IMAGE"
+              ? b.buttons
+                  .filter((btn) => btn.label.trim() && btn.href.trim())
+                  .map((btn) => ({
+                    label: btn.label.trim(),
+                    href: btn.href.trim(),
+                    variant: btn.variant,
+                  }))
+              : [],
           content: b.type === "RICH_TEXT" ? b.content : null,
           beltId: b.type === "BELT" ? beltId : null,
         });
@@ -518,6 +543,108 @@ export default function AdminPagesPage() {
                           ))}
                         </div>
                       ) : null}
+
+                      <div className="space-y-2 rounded-xl border border-[var(--line)] bg-white p-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-sm font-semibold">
+                            Buttons / links
+                          </span>
+                          <button
+                            type="button"
+                            className="btn btn-secondary !min-h-8 !rounded-lg !px-2 !py-1 text-xs"
+                            onClick={() =>
+                              updateBlock(block.id, {
+                                buttons: [
+                                  ...block.buttons,
+                                  {
+                                    id: `btn-${Date.now()}`,
+                                    label: "",
+                                    href: "",
+                                    variant: "primary",
+                                  },
+                                ],
+                              })
+                            }
+                          >
+                            + Button
+                          </button>
+                        </div>
+                        {block.buttons.length === 0 ? (
+                          <p className="text-xs text-[var(--muted)]">
+                            Optional CTAs on the banner (theme primary /
+                            secondary).
+                          </p>
+                        ) : null}
+                        {block.buttons.map((btn) => (
+                          <div
+                            key={btn.id}
+                            className="grid gap-2 rounded-lg border border-[var(--line)] p-2 sm:grid-cols-[1fr_1fr_auto_auto]"
+                          >
+                            <input
+                              className="input !min-h-10"
+                              placeholder="Label"
+                              value={btn.label}
+                              onChange={(e) =>
+                                updateBlock(block.id, {
+                                  buttons: block.buttons.map((x) =>
+                                    x.id === btn.id
+                                      ? { ...x, label: e.target.value }
+                                      : x,
+                                  ),
+                                })
+                              }
+                            />
+                            <input
+                              className="input !min-h-10"
+                              placeholder="/menu or https://…"
+                              value={btn.href}
+                              onChange={(e) =>
+                                updateBlock(block.id, {
+                                  buttons: block.buttons.map((x) =>
+                                    x.id === btn.id
+                                      ? { ...x, href: e.target.value }
+                                      : x,
+                                  ),
+                                })
+                              }
+                            />
+                            <select
+                              className="input !min-h-10"
+                              value={btn.variant}
+                              onChange={(e) =>
+                                updateBlock(block.id, {
+                                  buttons: block.buttons.map((x) =>
+                                    x.id === btn.id
+                                      ? {
+                                          ...x,
+                                          variant: e.target.value as
+                                            | "primary"
+                                            | "secondary",
+                                        }
+                                      : x,
+                                  ),
+                                })
+                              }
+                            >
+                              <option value="primary">Primary</option>
+                              <option value="secondary">Secondary</option>
+                            </select>
+                            <button
+                              type="button"
+                              className="btn btn-danger !min-h-10 !rounded-lg !px-3 text-xs"
+                              onClick={() =>
+                                updateBlock(block.id, {
+                                  buttons: block.buttons.filter(
+                                    (x) => x.id !== btn.id,
+                                  ),
+                                })
+                              }
+                            >
+                              ×
+                            </button>
+                          </div>
+                        ))}
+                      </div>
                     </>
                   ) : null}
 

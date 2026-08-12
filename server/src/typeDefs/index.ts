@@ -127,6 +127,12 @@ export const typeDefs = `#graphql
     SLIDER
   }
 
+  type BannerButton {
+    label: String!
+    href: String!
+    variant: String!
+  }
+
   type PageBlock {
     id: ID!
     type: PageBlockType!
@@ -135,6 +141,7 @@ export const typeDefs = `#graphql
     images: [String!]!
     imageLayout: ImageLayout
     isBanner: Boolean!
+    buttons: [BannerButton!]!
     content: String
     beltId: ID
     belt: Belt
@@ -334,6 +341,12 @@ export const typeDefs = `#graphql
     menuIds: [ID!]
   }
 
+  input BannerButtonInput {
+    label: String!
+    href: String!
+    variant: String
+  }
+
   input PageBlockInput {
     id: ID
     type: PageBlockType!
@@ -342,6 +355,7 @@ export const typeDefs = `#graphql
     images: [String!]
     imageLayout: ImageLayout
     isBanner: Boolean
+    buttons: [BannerButtonInput!]
     content: String
     beltId: ID
   }

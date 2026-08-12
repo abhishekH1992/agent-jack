@@ -2,6 +2,13 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import clsx from "clsx";
+
+export type BannerButton = {
+  label: string;
+  href: string;
+  variant?: "primary" | "secondary" | string;
+};
 
 function ArrowIcon({ dir }: { dir: "left" | "right" }) {
   return (
@@ -24,7 +31,57 @@ function ArrowIcon({ dir }: { dir: "left" | "right" }) {
   );
 }
 
-function TextHero({ siteName }: { siteName: string }) {
+function BannerCtas({ buttons }: { buttons: BannerButton[] }) {
+  if (!buttons.length) return null;
+  return (
+    <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 bg-gradient-to-t from-black/55 via-black/25 to-transparent pt-16 pb-5 sm:pb-6">
+      <div className="page-shell pointer-events-auto">
+        <div className="flex flex-wrap justify-start gap-2.5">
+          {buttons.map((btn) => {
+            const secondary = btn.variant === "secondary";
+            const external = /^https?:\/\//i.test(btn.href);
+            const className = clsx(
+              "inline-flex min-h-11 cursor-pointer items-center justify-center rounded-full px-5 text-sm font-semibold transition duration-200 active:scale-[0.98]",
+              secondary
+                ? "border-2 border-white bg-white/95 text-[var(--brand)] hover:bg-white"
+                : "bg-[var(--cta)] text-white hover:opacity-90",
+            );
+            if (external) {
+              return (
+                <a
+                  key={`${btn.label}-${btn.href}`}
+                  href={btn.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={className}
+                >
+                  {btn.label}
+                </a>
+              );
+            }
+            return (
+              <Link
+                key={`${btn.label}-${btn.href}`}
+                href={btn.href}
+                className={className}
+              >
+                {btn.label}
+              </Link>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TextHero({
+  siteName,
+  buttons,
+}: {
+  siteName: string;
+  buttons: BannerButton[];
+}) {
   return (
     <section className="relative overflow-hidden">
       <div
@@ -39,20 +96,27 @@ function TextHero({ siteName }: { siteName: string }) {
           Scan your table QR, chase live liquor prices, and order without
           leaving your seat.
         </p>
-        <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-          <Link
-            href="#menu"
-            className="inline-flex min-h-12 cursor-pointer items-center justify-center rounded-full bg-[var(--cta)] px-6 text-sm font-semibold text-white transition duration-200 hover:opacity-90 active:scale-[0.98]"
-          >
-            Browse menu
-          </Link>
-          <Link
-            href="/cart"
-            className="inline-flex min-h-12 cursor-pointer items-center justify-center rounded-full border-2 border-[var(--brand)] bg-white px-6 text-sm font-semibold text-[var(--brand)] transition duration-200 hover:bg-[var(--brand-soft)] active:scale-[0.98]"
-          >
-            View cart
-          </Link>
-        </div>
+        {buttons.length > 0 ? (
+          <div className="mt-6 flex flex-wrap justify-start gap-3">
+            {buttons.map((btn) => {
+              const secondary = btn.variant === "secondary";
+              return (
+                <Link
+                  key={`${btn.label}-${btn.href}`}
+                  href={btn.href}
+                  className={clsx(
+                    "inline-flex min-h-12 cursor-pointer items-center justify-center rounded-full px-6 text-sm font-semibold transition duration-200 active:scale-[0.98]",
+                    secondary
+                      ? "border-2 border-[var(--brand)] bg-white text-[var(--brand)] hover:bg-[var(--brand-soft)]"
+                      : "bg-[var(--cta)] text-white hover:opacity-90",
+                  )}
+                >
+                  {btn.label}
+                </Link>
+              );
+            })}
+          </div>
+        ) : null}
       </div>
     </section>
   );
@@ -61,11 +125,14 @@ function TextHero({ siteName }: { siteName: string }) {
 export function HomeBanner({
   banners,
   siteName = "Agent Jack",
+  buttons = [],
 }: {
   banners: string[];
   siteName?: string;
+  buttons?: BannerButton[];
 }) {
   const slides = (banners || []).map((b) => b.trim()).filter(Boolean);
+  const ctas = (buttons || []).filter((b) => b.label?.trim() && b.href?.trim());
   const [index, setIndex] = useState(0);
   const [failed, setFailed] = useState<Record<number, boolean>>({});
   const [touchStartX, setTouchStartX] = useState<number | null>(null);
@@ -99,7 +166,7 @@ export function HomeBanner({
   }, [failed, index, slides.length, usableIndexes]);
 
   if (!slides.length || usableIndexes.length === 0) {
-    return <TextHero siteName={siteName} />;
+    return <TextHero siteName={siteName} buttons={ctas} />;
   }
 
   const multi = usableIndexes.length > 1;
@@ -141,9 +208,16 @@ export function HomeBanner({
           </div>
         ))}
 
+        <BannerCtas buttons={ctas} />
+
         {multi && (
           <>
-            <div className="absolute bottom-3 left-1/2 z-10 flex -translate-x-1/2 gap-1.5">
+            <div
+              className={clsx(
+                "absolute left-1/2 z-10 flex -translate-x-1/2 gap-1.5",
+                ctas.length ? "bottom-[4.75rem] sm:bottom-20" : "bottom-3",
+              )}
+            >
               {usableIndexes.map((i) => (
                 <button
                   key={i}

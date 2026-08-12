@@ -122,17 +122,42 @@ export const pageInclude = {
   },
 } as const;
 
+export function normalizeButtons(raw: unknown) {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((item) => {
+      if (!item || typeof item !== "object") return null;
+      const label = String((item as any).label || "").trim();
+      const href = String((item as any).href || "").trim();
+      if (!label || !href) return null;
+      const variant =
+        (item as any).variant === "secondary" ? "secondary" : "primary";
+      return { label, href, variant };
+    })
+    .filter(Boolean) as Array<{
+    label: string;
+    href: string;
+    variant: string;
+  }>;
+}
+
 export async function mapPage(page: any) {
   const blocks = await Promise.all(
     (page.blocks || []).map(async (block: any) => {
+      const buttons = normalizeButtons(block.buttons);
       if (block.type === "BELT" && block.belt) {
         const menus = await resolveBeltMenus(block.belt);
         return {
           ...block,
+          buttons,
           belt: mapBelt(block.belt, menus),
         };
       }
-      return { ...block, belt: block.belt ? mapBelt(block.belt, []) : null };
+      return {
+        ...block,
+        buttons,
+        belt: block.belt ? mapBelt(block.belt, []) : null,
+      };
     }),
   );
   return { ...page, blocks };
@@ -159,16 +184,7 @@ export async function persistPage(input: any, id?: string) {
       data: {
         ...data,
         blocks: {
-          create: blocks.map((b, index) => ({
-            type: b.type,
-            sortOrder: b.sortOrder ?? index,
-            isEnable: b.isEnable ?? true,
-            images: b.images || [],
-            imageLayout: b.imageLayout || null,
-            isBanner: Boolean(b.isBanner),
-            content: b.content || null,
-            beltId: b.type === "BELT" ? b.beltId || null : null,
-          })),
+          create: blocks.map((b, index) => mapBlockCreate(b, index)),
         },
       },
       include: pageInclude,
@@ -180,21 +196,26 @@ export async function persistPage(input: any, id?: string) {
     data: {
       ...data,
       blocks: {
-        create: blocks.map((b, index) => ({
-          type: b.type,
-          sortOrder: b.sortOrder ?? index,
-          isEnable: b.isEnable ?? true,
-          images: b.images || [],
-          imageLayout: b.imageLayout || null,
-          isBanner: Boolean(b.isBanner),
-          content: b.content || null,
-          beltId: b.type === "BELT" ? b.beltId || null : null,
-        })),
+        create: blocks.map((b, index) => mapBlockCreate(b, index)),
       },
     },
     include: pageInclude,
   });
   return mapPage(page);
+}
+
+function mapBlockCreate(b: any, index: number) {
+  return {
+    type: b.type,
+    sortOrder: b.sortOrder ?? index,
+    isEnable: b.isEnable ?? true,
+    images: b.images || [],
+    imageLayout: b.imageLayout || null,
+    isBanner: Boolean(b.isBanner),
+    buttons: normalizeButtons(b.buttons),
+    content: b.content || null,
+    beltId: b.type === "BELT" ? b.beltId || null : null,
+  };
 }
 
 function slugifyPage(s: string) {

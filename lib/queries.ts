@@ -94,7 +94,9 @@ export const DELETE_BELT = `
 const PAGE_FIELDS = `
   id title slug isEnable sortOrder
   blocks {
-    id type sortOrder isEnable images imageLayout isBanner content beltId
+    id type sortOrder isEnable images imageLayout isBanner
+    buttons { label href variant }
+    content beltId
     belt {
       id name sourceType categoryId subCategoryId isSlider isEnable sortOrder
       category { id name slug }
