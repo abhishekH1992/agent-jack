@@ -251,21 +251,106 @@ export function normalizeButtons(raw: unknown) {
   }>;
 }
 
+type BannerSlide = {
+  src: string;
+  header: string;
+  subheader: string;
+  buttons: Array<{ label: string; href: string; variant: string }>;
+};
+
+function parseBannerCopy(content: string | null | undefined) {
+  if (!content?.trim()) return { header: "", subheader: "" };
+  try {
+    const parsed = JSON.parse(content);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      return {
+        header: String(parsed.header ?? parsed.title ?? "").trim(),
+        subheader: String(parsed.subheader ?? parsed.subtitle ?? "").trim(),
+      };
+    }
+  } catch {
+    // ignore non-JSON
+  }
+  return { header: "", subheader: "" };
+}
+
+export function parseBannerSlides(
+  content: string | null | undefined,
+  images: string[] = [],
+  buttons: BannerSlide["buttons"] = [],
+): BannerSlide[] {
+  const fallback = parseBannerCopy(content);
+  const sharedButtons = normalizeButtons(buttons);
+
+  if (content?.trim()) {
+    try {
+      const parsed = JSON.parse(content);
+      if (parsed && Array.isArray(parsed.slides)) {
+        const slides = parsed.slides
+          .map((item: any) => {
+            const src = String(item?.src || "").trim();
+            if (!src) return null;
+            return {
+              src,
+              header: String(item.header ?? "").trim(),
+              subheader: String(item.subheader ?? "").trim(),
+              buttons: normalizeButtons(item.buttons),
+            } satisfies BannerSlide;
+          })
+          .filter(Boolean) as BannerSlide[];
+        if (slides.length) return slides;
+      }
+    } catch {
+      // fall through
+    }
+  }
+
+  return (images || [])
+    .map((src) => String(src || "").trim())
+    .filter(Boolean)
+    .map((src) => ({
+      src,
+      header: fallback.header,
+      subheader: fallback.subheader,
+      buttons: sharedButtons,
+    }));
+}
+
+function normalizeSlides(raw: unknown): BannerSlide[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((item) => {
+      if (!item || typeof item !== "object") return null;
+      const src = String((item as any).src || "").trim();
+      if (!src) return null;
+      return {
+        src,
+        header: String((item as any).header ?? "").trim(),
+        subheader: String((item as any).subheader ?? "").trim(),
+        buttons: normalizeButtons((item as any).buttons),
+      } satisfies BannerSlide;
+    })
+    .filter(Boolean) as BannerSlide[];
+}
+
 export async function mapPage(page: any) {
   const blocks = await Promise.all(
     (page.blocks || []).map(async (block: any) => {
       const buttons = normalizeButtons(block.buttons);
+      const slides = parseBannerSlides(block.content, block.images, buttons);
       if (block.type === "BELT" && block.belt) {
         const menus = await resolveBeltMenus(block.belt);
         return {
           ...block,
           buttons,
+          slides,
           belt: mapBelt(block.belt, menus),
         };
       }
       return {
         ...block,
         buttons,
+        slides,
         belt: block.belt ? mapBelt(block.belt, []) : null,
       };
     }),
@@ -315,15 +400,37 @@ export async function persistPage(input: any, id?: string) {
 }
 
 function mapBlockCreate(b: any, index: number) {
+  const isImage = b.type === "IMAGE";
+  const isBanner = isImage && Boolean(b.isBanner);
+  const fromInput = isImage ? normalizeSlides(b.slides) : [];
+  const slides = isImage
+    ? fromInput.length
+      ? fromInput
+      : parseBannerSlides(b.content, b.images || [], normalizeButtons(b.buttons))
+    : [];
+  const images = isImage
+    ? slides.length
+      ? slides.map((s) => s.src)
+      : b.images || []
+    : [];
+
   return {
     type: b.type,
     sortOrder: b.sortOrder ?? index,
     isEnable: b.isEnable ?? true,
-    images: b.images || [],
-    imageLayout: b.imageLayout || null,
-    isBanner: Boolean(b.isBanner),
-    buttons: normalizeButtons(b.buttons),
-    content: b.content || null,
+    images,
+    imageLayout: isImage ? b.imageLayout || null : null,
+    isBanner,
+    buttons: isBanner
+      ? slides[0]?.buttons || []
+      : isImage
+        ? normalizeButtons(b.buttons)
+        : [],
+    content: isBanner
+      ? JSON.stringify({ slides })
+      : b.type === "RICH_TEXT" || b.type === "MENU_BROWSE"
+        ? b.content || null
+        : null,
     beltId: b.type === "BELT" ? b.beltId || null : null,
   };
 }

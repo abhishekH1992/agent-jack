@@ -191,22 +191,45 @@ function TextHero({
 }
 
 export function HomeBanner({
-  banners,
+  slides: slideInput,
+  banners = [],
   siteName = "Agent Jack",
   buttons = [],
   header = "",
   subheader = "",
 }: {
-  banners: string[];
+  slides?: Array<{
+    src: string;
+    header?: string | null;
+    subheader?: string | null;
+    buttons?: BannerButton[] | null;
+  }>;
+  banners?: string[];
   siteName?: string;
   buttons?: BannerButton[];
   header?: string;
   subheader?: string;
 }) {
-  const slides = (banners || []).map((b) => b.trim()).filter(Boolean);
-  const ctas = (buttons || []).filter((b) => b.label?.trim() && b.href?.trim());
-  const title = (header || "").trim();
-  const subtitle = (subheader || "").trim();
+  const slides = (
+    slideInput?.length
+      ? slideInput.map((slide) => ({
+          src: (slide.src || "").trim(),
+          header: (slide.header || "").trim(),
+          subheader: (slide.subheader || "").trim(),
+          buttons: (slide.buttons || []).filter(
+            (b) => b.label?.trim() && b.href?.trim(),
+          ),
+        }))
+      : (banners || []).map((src) => ({
+          src: src.trim(),
+          header: (header || "").trim(),
+          subheader: (subheader || "").trim(),
+          buttons: (buttons || []).filter(
+            (b) => b.label?.trim() && b.href?.trim(),
+          ),
+        }))
+  ).filter((slide) => slide.src);
+
   const [index, setIndex] = useState(0);
   const [failed, setFailed] = useState<Record<number, boolean>>({});
   const [touchStartX, setTouchStartX] = useState<number | null>(null);
@@ -239,19 +262,23 @@ export function HomeBanner({
     }
   }, [failed, index, slides.length, usableIndexes]);
 
+  const fallback = slides[0];
   if (!slides.length || usableIndexes.length === 0) {
     return (
       <TextHero
         siteName={siteName}
-        header={title}
-        subheader={subtitle}
-        buttons={ctas}
+        header={(fallback?.header || header || "").trim()}
+        subheader={(fallback?.subheader || subheader || "").trim()}
+        buttons={fallback?.buttons?.length ? fallback.buttons : buttons}
       />
     );
   }
 
   const multi = usableIndexes.length > 1;
-  const hasCopy = Boolean(title || subtitle);
+  const current = slides[index] || slides[usableIndexes[0]];
+  const hasCopy = Boolean(
+    current?.header || current?.subheader || current?.buttons.length,
+  );
 
   return (
     <section
@@ -269,7 +296,7 @@ export function HomeBanner({
       <div className="relative aspect-[16/10] w-full min-h-[220px] max-h-[420px] sm:aspect-[21/9] sm:min-h-[260px]">
         {usableIndexes.map((i) => (
           <div
-            key={slides[i]}
+            key={`${slides[i].src}-${i}`}
             className={`absolute inset-0 transition-opacity duration-500 ${
               i === index ? "opacity-100" : "pointer-events-none opacity-0"
             }`}
@@ -277,7 +304,7 @@ export function HomeBanner({
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src={slides[i]}
+              src={slides[i].src}
               alt=""
               className="h-full w-full object-cover"
               onError={() =>
@@ -287,23 +314,20 @@ export function HomeBanner({
                 }))
               }
             />
+            <BannerOverlay
+              header={slides[i].header}
+              subheader={slides[i].subheader}
+              buttons={slides[i].buttons}
+            />
           </div>
         ))}
-
-        <BannerOverlay
-          header={title}
-          subheader={subtitle}
-          buttons={ctas}
-        />
 
         {multi && (
           <>
             <div
               className={clsx(
                 "absolute left-1/2 z-10 flex -translate-x-1/2 gap-1.5",
-                hasCopy || ctas.length
-                  ? "bottom-3 sm:bottom-[5.5rem]"
-                  : "bottom-3",
+                hasCopy ? "bottom-3 sm:bottom-[5.5rem]" : "bottom-3",
               )}
             >
               {usableIndexes.map((i) => (

@@ -138,6 +138,13 @@ export const typeDefs = `#graphql
     variant: String!
   }
 
+  type BannerSlide {
+    src: String!
+    header: String
+    subheader: String
+    buttons: [BannerButton!]!
+  }
+
   type PageBlock {
     id: ID!
     type: PageBlockType!
@@ -147,6 +154,7 @@ export const typeDefs = `#graphql
     imageLayout: ImageLayout
     isBanner: Boolean!
     buttons: [BannerButton!]!
+    slides: [BannerSlide!]!
     content: String
     beltId: ID
     belt: Belt
@@ -452,6 +460,13 @@ export const typeDefs = `#graphql
     variant: String
   }
 
+  input BannerSlideInput {
+    src: String!
+    header: String
+    subheader: String
+    buttons: [BannerButtonInput!]
+  }
+
   input PageBlockInput {
     id: ID
     type: PageBlockType!
@@ -461,6 +476,7 @@ export const typeDefs = `#graphql
     imageLayout: ImageLayout
     isBanner: Boolean
     buttons: [BannerButtonInput!]
+    slides: [BannerSlideInput!]
     content: String
     beltId: ID
   }

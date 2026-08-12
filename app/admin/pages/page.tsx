@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import { adminGql } from "@/lib/admin";
 import { usePagedSearch } from "@/lib/admin-list";
-import { uploadAdminFiles } from "@/lib/admin-upload";
 import {
   ADMIN_CATALOG_QUERY,
   BELTS_QUERY,
@@ -19,7 +18,13 @@ import {
   AdminPagination,
   AdminSearchBar,
 } from "@/components/admin/AdminListControls";
-import { ImageUploadField } from "@/components/admin/ImageUploadField";
+import {
+  ImageBlockFields,
+  slidesFromApi,
+  slideToInput,
+  type BannerSlideForm,
+  type ImageLayout,
+} from "@/components/admin/ImageBlockFields";
 import { SortableList } from "@/components/admin/SortableList";
 import {
   BeltSourceFields,
@@ -29,43 +34,21 @@ import {
   type BeltSourceValue,
 } from "@/components/admin/BeltSourceFields";
 import {
-  menuCategoryHref,
-  menuSubcategoryHref,
-  parseMenuButtonHref,
-  type MenuLinkType,
-} from "@/lib/menu-links";
-import {
   parseMenuBrowseConfig,
   serializeMenuBrowseConfig,
   type MenuBrowseConfig,
 } from "@/lib/menu-browse";
-import {
-  parseBannerCopy,
-  serializeBannerCopy,
-} from "@/lib/banner-copy";
 
 type BlockType = "IMAGE" | "RICH_TEXT" | "BELT" | "MENU_BROWSE";
-type ImageLayout = "SINGLE" | "COLUMN" | "SLIDER";
-
-type BannerButtonForm = {
-  id: string;
-  label: string;
-  href: string;
-  variant: "primary" | "secondary";
-  linkType: MenuLinkType;
-  categoryId: string;
-  subCategoryId: string;
-};
 
 type BlockForm = {
   id: string;
   type: BlockType;
   sortOrder: number;
   isEnable: boolean;
-  images: string[];
+  slides: BannerSlideForm[];
   imageLayout: ImageLayout;
   isBanner: boolean;
-  buttons: BannerButtonForm[];
   content: string;
   beltId: string;
   belt: BeltSourceValue;
@@ -86,10 +69,9 @@ const emptyBlock = (
   type,
   sortOrder: 0,
   isEnable: true,
-  images: [],
+  slides: [],
   imageLayout: "SINGLE",
   isBanner: false,
-  buttons: [],
   content:
     type === "MENU_BROWSE"
       ? serializeMenuBrowseConfig({
@@ -221,26 +203,9 @@ export default function AdminPagesPage() {
         type: b.type,
         sortOrder: Number(b.sortOrder ?? i),
         isEnable: b.isEnable !== false,
-        images: b.images || [],
+        slides: slidesFromApi(b.slides, b.images, categories),
         imageLayout: (b.imageLayout || "SINGLE") as ImageLayout,
         isBanner: Boolean(b.isBanner),
-        buttons: (b.buttons || []).map((btn: any, bi: number) => {
-          const parsed = parseMenuButtonHref(btn.href || "");
-          const cat =
-            categories.find(
-              (c) =>
-                c.slug === parsed.categorySlug || c.id === parsed.categorySlug,
-            ) || null;
-          return {
-            id: `btn-${b.id || i}-${bi}`,
-            label: btn.label || "",
-            href: btn.href || "",
-            variant: btn.variant === "secondary" ? "secondary" : "primary",
-            linkType: parsed.linkType,
-            categoryId: cat?.id || "",
-            subCategoryId: parsed.subId || "",
-          };
-        }),
         content:
           b.type === "MENU_BROWSE"
             ? serializeMenuBrowseConfig(parseMenuBrowseConfig(b.content))
@@ -272,60 +237,6 @@ export default function AdminPagesPage() {
       ),
     [categories],
   );
-
-  function buildButtonHref(btn: BannerButtonForm): string {
-    if (btn.linkType === "category") {
-      const cat = categories.find((c) => c.id === btn.categoryId);
-      return cat ? menuCategoryHref(cat.slug) : "/menu";
-    }
-    if (btn.linkType === "subcategory") {
-      const sub = allSubCategories.find((s) => s.id === btn.subCategoryId);
-      if (!sub) return "/menu";
-      return menuSubcategoryHref(sub.categorySlug, sub.id);
-    }
-    return btn.href;
-  }
-
-  function updateButton(
-    blockId: string,
-    buttonId: string,
-    patch: Partial<BannerButtonForm>,
-  ) {
-    setForm((prev) => ({
-      ...prev,
-      blocks: prev.blocks.map((block) => {
-        if (block.id !== blockId) return block;
-        return {
-          ...block,
-          buttons: block.buttons.map((btn) => {
-            if (btn.id !== buttonId) return btn;
-            const next = { ...btn, ...patch };
-            // Keep label in sync when picking category/sub unless admin typed custom
-            if (patch.categoryId && next.linkType === "category") {
-              const cat = categories.find((c) => c.id === patch.categoryId);
-              if (cat && (!btn.label || btn.label === categories.find((c) => c.id === btn.categoryId)?.name)) {
-                next.label = cat.name;
-              }
-            }
-            if (patch.subCategoryId && next.linkType === "subcategory") {
-              const sub = allSubCategories.find(
-                (s) => s.id === patch.subCategoryId,
-              );
-              const prevSub = allSubCategories.find(
-                (s) => s.id === btn.subCategoryId,
-              );
-              if (sub && (!btn.label || btn.label === prevSub?.name)) {
-                next.label = sub.name;
-              }
-              if (sub) next.categoryId = sub.categoryId;
-            }
-            next.href = buildButtonHref(next);
-            return next;
-          }),
-        };
-      }),
-    }));
-  }
 
   function selectExistingBelt(blockId: string, beltId: string) {
     const belt = belts.find((b) => b.id === beltId);
@@ -375,29 +286,23 @@ export default function AdminPagesPage() {
         if (b.type === "BELT") {
           beltId = await upsertBeltForBlock(b, i);
         }
+        const slides =
+          b.type === "IMAGE"
+            ? b.slides.filter((s) => s.src.trim()).map(slideToInput)
+            : [];
         blocks.push({
           type: b.type,
           sortOrder: i,
           isEnable: b.isEnable,
-          images: b.type === "IMAGE" ? b.images : [],
+          images: slides.map((s) => s.src),
           imageLayout: b.type === "IMAGE" ? b.imageLayout : null,
           isBanner: b.type === "IMAGE" ? b.isBanner : false,
-          buttons:
-            b.type === "IMAGE"
-              ? b.buttons
-                  .filter((btn) => btn.label.trim() && btn.href.trim())
-                  .map((btn) => ({
-                    label: btn.label.trim(),
-                    href: btn.href.trim(),
-                    variant: btn.variant,
-                  }))
-              : [],
+          slides,
+          buttons: [],
           content:
             b.type === "RICH_TEXT" || b.type === "MENU_BROWSE"
               ? b.content
-              : b.type === "IMAGE" && b.isBanner
-                ? serializeBannerCopy(parseBannerCopy(b.content))
-                : null,
+              : null,
           beltId: b.type === "BELT" ? beltId : null,
         });
       }
@@ -452,8 +357,8 @@ export default function AdminPagesPage() {
             Pages
           </h1>
           <p className="text-sm text-[var(--muted)]">
-            Drag blocks to reorder. Belt blocks pick a category, subcategory, or
-            handpicked menus.
+            Drag blocks to reorder. Banner slides have their own header,
+            subheader, and button — drag those too.
           </p>
         </div>
         <button
@@ -594,6 +499,7 @@ export default function AdminPagesPage() {
             </div>
 
             <SortableList
+              id="page-blocks"
               items={form.blocks}
               onReorder={(blocks) =>
                 setForm((prev) => ({
@@ -636,282 +542,15 @@ export default function AdminPagesPage() {
                   </label>
 
                   {block.type === "IMAGE" ? (
-                    <>
-                      <label className="block space-y-1 text-sm">
-                        <span className="text-[var(--muted)]">Layout</span>
-                        <select
-                          className="input"
-                          value={block.imageLayout}
-                          onChange={(e) =>
-                            updateBlock(block.id, {
-                              imageLayout: e.target.value as ImageLayout,
-                            })
-                          }
-                        >
-                          <option value="SINGLE">Single full width</option>
-                          <option value="COLUMN">Column (multi)</option>
-                          <option value="SLIDER">Slider (multi)</option>
-                        </select>
-                      </label>
-                      <label className="inline-flex items-center gap-2 text-sm">
-                        <input
-                          type="checkbox"
-                          checked={block.isBanner}
-                          onChange={(e) => {
-                            const isBanner = e.target.checked;
-                            updateBlock(block.id, {
-                              isBanner,
-                              imageLayout: isBanner
-                                ? "SLIDER"
-                                : block.imageLayout,
-                              content: isBanner
-                                ? serializeBannerCopy(
-                                    parseBannerCopy(block.content),
-                                  )
-                                : block.content,
-                            });
-                          }}
-                        />
-                        Is banner (full-bleed hero slider)
-                      </label>
-                      {block.isBanner ? (
-                        <div className="grid gap-2 sm:grid-cols-2">
-                          <label className="block space-y-1 text-sm sm:col-span-2">
-                            <span className="text-[var(--muted)]">
-                              Header (optional)
-                            </span>
-                            <input
-                              className="input"
-                              placeholder="e.g. Bid · Order · Feast"
-                              value={parseBannerCopy(block.content).header}
-                              onChange={(e) =>
-                                updateBlock(block.id, {
-                                  content: serializeBannerCopy({
-                                    ...parseBannerCopy(block.content),
-                                    header: e.target.value,
-                                  }),
-                                })
-                              }
-                            />
-                          </label>
-                          <label className="block space-y-1 text-sm sm:col-span-2">
-                            <span className="text-[var(--muted)]">
-                              Subheader (optional)
-                            </span>
-                            <input
-                              className="input"
-                              placeholder="e.g. Live liquor prices from your table"
-                              value={parseBannerCopy(block.content).subheader}
-                              onChange={(e) =>
-                                updateBlock(block.id, {
-                                  content: serializeBannerCopy({
-                                    ...parseBannerCopy(block.content),
-                                    subheader: e.target.value,
-                                  }),
-                                })
-                              }
-                            />
-                          </label>
-                        </div>
-                      ) : null}
-                      <ImageUploadField
-                        value=""
-                        folder="banners"
-                        onChange={() => undefined}
-                        multiple
-                        onFiles={async (files) => {
-                          try {
-                            const urls = await uploadAdminFiles(
-                              files,
-                              "banners",
-                            );
-                            updateBlock(block.id, {
-                              images: [...block.images, ...urls],
-                            });
-                          } catch (err: any) {
-                            toast.error(err.message || "Upload failed");
-                          }
-                        }}
-                      />
-                      {block.images.length > 0 ? (
-                        <div className="flex flex-wrap gap-2">
-                          {block.images.map((src) => (
-                            <div key={src} className="relative">
-                              {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img
-                                src={src}
-                                alt=""
-                                className="h-16 w-24 rounded-lg object-cover"
-                              />
-                              <button
-                                type="button"
-                                className="absolute -right-1 -top-1 rounded-full bg-white px-1.5 text-xs shadow"
-                                onClick={() =>
-                                  updateBlock(block.id, {
-                                    images: block.images.filter(
-                                      (x) => x !== src,
-                                    ),
-                                  })
-                                }
-                              >
-                                ×
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      ) : null}
-
-                      <div className="space-y-2 rounded-xl border border-[var(--line)] bg-white p-3">
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-sm font-semibold">
-                            Buttons / links
-                          </span>
-                          <button
-                            type="button"
-                            className="btn btn-secondary !min-h-8 !rounded-lg !px-2 !py-1 text-xs"
-                            onClick={() =>
-                              updateBlock(block.id, {
-                                buttons: [
-                                  ...block.buttons,
-                                  {
-                                    id: `btn-${Date.now()}`,
-                                    label: "",
-                                    href: "",
-                                    variant: "primary",
-                                    linkType: "subcategory",
-                                    categoryId: "",
-                                    subCategoryId: "",
-                                  },
-                                ],
-                              })
-                            }
-                          >
-                            + Button
-                          </button>
-                        </div>
-                        {block.buttons.length === 0 ? (
-                          <p className="text-xs text-[var(--muted)]">
-                            Link to a category or subcategory on /menu, or a
-                            custom URL.
-                          </p>
-                        ) : null}
-                        {block.buttons.map((btn) => (
-                          <div
-                            key={btn.id}
-                            className="space-y-2 rounded-lg border border-[var(--line)] p-2"
-                          >
-                            <div className="grid gap-2 sm:grid-cols-[1fr_auto_auto]">
-                              <input
-                                className="input !min-h-10"
-                                placeholder="Label"
-                                value={btn.label}
-                                onChange={(e) =>
-                                  updateButton(block.id, btn.id, {
-                                    label: e.target.value,
-                                  })
-                                }
-                              />
-                              <select
-                                className="input !min-h-10"
-                                value={btn.variant}
-                                onChange={(e) =>
-                                  updateButton(block.id, btn.id, {
-                                    variant: e.target.value as
-                                      | "primary"
-                                      | "secondary",
-                                  })
-                                }
-                              >
-                                <option value="primary">Primary</option>
-                                <option value="secondary">Secondary</option>
-                              </select>
-                              <button
-                                type="button"
-                                className="btn btn-danger !min-h-10 !rounded-lg !px-3 text-xs"
-                                onClick={() =>
-                                  updateBlock(block.id, {
-                                    buttons: block.buttons.filter(
-                                      (x) => x.id !== btn.id,
-                                    ),
-                                  })
-                                }
-                              >
-                                ×
-                              </button>
-                            </div>
-                            <select
-                              className="input !min-h-10"
-                              value={btn.linkType}
-                              onChange={(e) =>
-                                updateButton(block.id, btn.id, {
-                                  linkType: e.target.value as MenuLinkType,
-                                  href:
-                                    e.target.value === "custom" ? btn.href : "",
-                                })
-                              }
-                            >
-                              <option value="subcategory">
-                                Menu subcategory
-                              </option>
-                              <option value="category">Menu category</option>
-                              <option value="custom">Custom URL</option>
-                            </select>
-                            {btn.linkType === "category" ? (
-                              <select
-                                className="input !min-h-10"
-                                value={btn.categoryId}
-                                onChange={(e) =>
-                                  updateButton(block.id, btn.id, {
-                                    categoryId: e.target.value,
-                                  })
-                                }
-                              >
-                                <option value="">Select category…</option>
-                                {categories.map((c) => (
-                                  <option key={c.id} value={c.id}>
-                                    {c.name}
-                                  </option>
-                                ))}
-                              </select>
-                            ) : null}
-                            {btn.linkType === "subcategory" ? (
-                              <select
-                                className="input !min-h-10"
-                                value={btn.subCategoryId}
-                                onChange={(e) =>
-                                  updateButton(block.id, btn.id, {
-                                    subCategoryId: e.target.value,
-                                  })
-                                }
-                              >
-                                <option value="">Select subcategory…</option>
-                                {allSubCategories.map((s) => (
-                                  <option key={s.id} value={s.id}>
-                                    {s.categoryName} · {s.name}
-                                  </option>
-                                ))}
-                              </select>
-                            ) : null}
-                            {btn.linkType === "custom" ? (
-                              <input
-                                className="input !min-h-10"
-                                placeholder="/menu or https://…"
-                                value={btn.href}
-                                onChange={(e) =>
-                                  updateButton(block.id, btn.id, {
-                                    href: e.target.value,
-                                  })
-                                }
-                              />
-                            ) : (
-                              <p className="text-xs text-[var(--muted)]">
-                                Opens: {btn.href || "—"}
-                              </p>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </>
+                    <ImageBlockFields
+                      blockId={block.id}
+                      imageLayout={block.imageLayout}
+                      isBanner={block.isBanner}
+                      slides={block.slides}
+                      categories={categories}
+                      allSubCategories={allSubCategories}
+                      onChange={(patch) => updateBlock(block.id, patch)}
+                    />
                   ) : null}
 
                   {block.type === "RICH_TEXT" ? (

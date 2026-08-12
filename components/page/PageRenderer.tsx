@@ -3,7 +3,7 @@
 import { useState } from "react";
 import clsx from "clsx";
 import { HomeBanner } from "@/components/layout/HomeBanner";
-import { parseBannerCopy } from "@/lib/banner-copy";
+import { parseBannerSlides } from "@/lib/banner-copy";
 import { BeltSection } from "@/components/menu/BeltSection";
 import { MenuBrowseBlock } from "@/components/menu/MenuBrowseBlock";
 import { ItemModal, ModalMenu } from "@/components/menu/ItemModal";
@@ -19,6 +19,12 @@ export type PageBlockData = {
   imageLayout?: "SINGLE" | "COLUMN" | "SLIDER" | null;
   isBanner: boolean;
   buttons?: Array<{ label: string; href: string; variant?: string }> | null;
+  slides?: Array<{
+    src: string;
+    header?: string | null;
+    subheader?: string | null;
+    buttons?: Array<{ label: string; href: string; variant?: string }> | null;
+  }> | null;
   content?: string | null;
   belt?: {
     id: string;
@@ -99,11 +105,16 @@ export function PageRenderer({
               className={clsx(!first && "mt-10 sm:mt-12")}
             >
               <HomeBanner
-                banners={block.images || []}
+                slides={
+                  block.slides?.length
+                    ? block.slides
+                    : parseBannerSlides(
+                        block.content,
+                        block.images || [],
+                        block.buttons || [],
+                      )
+                }
                 siteName={siteName}
-                buttons={block.buttons || []}
-                header={parseBannerCopy(block.content).header}
-                subheader={parseBannerCopy(block.content).subheader}
               />
             </div>
           );

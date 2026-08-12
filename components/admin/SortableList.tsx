@@ -21,11 +21,13 @@ import { CSS } from "@dnd-kit/utilities";
 import clsx from "clsx";
 
 export function SortableList<T extends { id: string }>({
+  id,
   items,
   onReorder,
   renderItem,
   className,
 }: {
+  id?: string;
   items: T[];
   onReorder: (next: T[]) => void;
   renderItem: (item: T, handle: ReactNode) => ReactNode;
@@ -49,6 +51,7 @@ export function SortableList<T extends { id: string }>({
 
   return (
     <DndContext
+      id={id}
       sensors={sensors}
       collisionDetection={closestCenter}
       onDragEnd={onDragEnd}
@@ -95,6 +98,7 @@ function SortableRow({
       type="button"
       className="inline-flex min-h-9 min-w-9 cursor-grab items-center justify-center rounded-lg border border-[var(--line)] bg-white text-[var(--muted)] active:cursor-grabbing"
       aria-label="Drag to reorder"
+      onPointerDown={(e) => e.stopPropagation()}
       {...attributes}
       {...listeners}
     >

@@ -548,21 +548,35 @@ async function main() {
             imageLayout: "SLIDER",
             isBanner: true,
             content: JSON.stringify({
-              header: "Bid · Order · Feast",
-              subheader:
-                "Live liquor prices and table ordering — right from your seat.",
+              slides: banners.map((src, i) => ({
+                src,
+                header: "Bid · Order · Feast",
+                subheader:
+                  "Live liquor prices and table ordering — right from your seat.",
+                buttons:
+                  i === 0
+                    ? [
+                        {
+                          label: "Pancake",
+                          href:
+                            pancakeSubCategoryId && basicsCategorySlug
+                              ? `/menu?category=${encodeURIComponent(basicsCategorySlug)}&sub=${encodeURIComponent(pancakeSubCategoryId)}`
+                              : "/menu",
+                          variant: "primary",
+                        },
+                      ]
+                    : i === 1
+                      ? [{ label: "View cart", href: "/cart", variant: "secondary" }]
+                      : [
+                          {
+                            label: "Order now",
+                            href: "/menu",
+                            variant: "primary",
+                          },
+                        ],
+              })),
             }),
-            buttons: [
-              {
-                label: "Pancake",
-                href:
-                  pancakeSubCategoryId && basicsCategorySlug
-                    ? `/menu?category=${encodeURIComponent(basicsCategorySlug)}&sub=${encodeURIComponent(pancakeSubCategoryId)}`
-                    : "/menu",
-                variant: "primary",
-              },
-              { label: "View cart", href: "/cart", variant: "secondary" },
-            ],
+            buttons: [],
           },
           {
             type: "BELT",

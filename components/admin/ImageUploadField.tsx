@@ -10,6 +10,8 @@ export function ImageUploadField({
   onChange,
   folder = "images",
   multiple = false,
+  showPreview = true,
+  allowClear = true,
   onFiles,
 }: {
   label?: string;
@@ -17,6 +19,8 @@ export function ImageUploadField({
   onChange: (url: string) => void;
   folder?: "banners" | "images";
   multiple?: boolean;
+  showPreview?: boolean;
+  allowClear?: boolean;
   onFiles?: (files: File[]) => Promise<void> | void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -64,9 +68,11 @@ export function ImageUploadField({
                 ? "Add images"
                 : value
                   ? "Replace"
-                  : "Upload"}
+                  : showPreview
+                    ? "Upload"
+                    : "Add image"}
           </button>
-          {!multiple && value ? (
+          {!multiple && allowClear && value ? (
             <button
               type="button"
               className="btn btn-danger !px-3 !py-2 text-sm"
@@ -87,7 +93,7 @@ export function ImageUploadField({
         />
       </div>
 
-      {!multiple ? (
+      {!multiple && showPreview ? (
         value ? (
           <div className="overflow-hidden rounded-xl border border-[var(--line)] bg-white">
             {/* eslint-disable-next-line @next/next/no-img-element */}

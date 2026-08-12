@@ -96,6 +96,7 @@ const PAGE_FIELDS = `
   blocks {
     id type sortOrder isEnable images imageLayout isBanner
     buttons { label href variant }
+    slides { src header subheader buttons { label href variant } }
     content beltId
     belt {
       id name sourceType categoryId subCategoryId isSlider isEnable sortOrder
