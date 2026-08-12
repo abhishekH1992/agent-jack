@@ -27,7 +27,13 @@ type Order = {
   guestName?: string | null;
   note?: string | null;
   createdAt: string;
+  pointsRedeemed: number;
+  pointsDiscountNzd: number;
+  stampRedeemed: boolean;
+  pointsEarned: number;
+  stampsEarned: number;
   table?: { id: string; name: string } | null;
+  stampMenu?: { id: string; name: string } | null;
   items: OrderItem[];
 };
 
@@ -190,6 +196,20 @@ function OrdersList() {
                       Table {order.table?.name || "—"} ·{" "}
                       {formatWhen(order.createdAt)}
                     </div>
+                    {order.pointsRedeemed > 0 ? (
+                      <div className="mt-1 text-[11px] font-bold text-sky-800">
+                        {order.pointsRedeemed} pts applied · −
+                        {money(Number(order.pointsDiscountNzd))}
+                      </div>
+                    ) : null}
+                    {order.stampRedeemed ? (
+                      <div className="mt-1 text-[11px] font-bold text-emerald-800">
+                        Stamp applied
+                        {order.stampMenu?.name
+                          ? `: 1× ${order.stampMenu.name}`
+                          : ""}
+                      </div>
+                    ) : null}
                   </div>
                   <div className="shrink-0 text-right">
                     <div className="font-bold">
@@ -217,6 +237,24 @@ function OrdersList() {
                         {order.note}
                       </p>
                     ) : null}
+                    {(order.pointsRedeemed > 0 || order.stampRedeemed) && (
+                      <div className="mb-3 space-y-1 text-sm">
+                        {order.pointsRedeemed > 0 ? (
+                          <p className="font-semibold text-sky-800">
+                            {order.pointsRedeemed} points applied ·{" "}
+                            {money(Number(order.pointsDiscountNzd))} off
+                          </p>
+                        ) : null}
+                        {order.stampRedeemed ? (
+                          <p className="font-semibold text-emerald-800">
+                            Stamp applied
+                            {order.stampMenu?.name
+                              ? `: 1 free ${order.stampMenu.name}`
+                              : ""}
+                          </p>
+                        ) : null}
+                      </div>
+                    )}
                     <ul className="space-y-2 text-sm">
                       {order.items.map((item) => (
                         <li
@@ -228,6 +266,13 @@ function OrdersList() {
                               {item.quantity}×
                             </span>
                             {itemLabel(item)}
+                            {order.stampRedeemed &&
+                            order.stampMenu?.id &&
+                            item.menu?.id === order.stampMenu.id ? (
+                              <span className="ml-2 text-[11px] font-bold uppercase text-emerald-800">
+                                1 free stamp
+                              </span>
+                            ) : null}
                           </span>
                           <span className="shrink-0 font-semibold tabular-nums">
                             {money(Number(item.salePrice) * item.quantity)}

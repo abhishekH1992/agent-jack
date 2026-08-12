@@ -353,7 +353,9 @@ export const MY_ORDERS_QUERY = `
   query MyOrders {
     myOrders(limit: 50) {
       id orderNumber status totalAmount guestName guestEmail note createdAt
+      pointsRedeemed pointsDiscountNzd stampRedeemed pointsEarned stampsEarned
       table { id name }
+      stampMenu { id name }
       items {
         id quantity salePrice
         menu { id name pricingEnabled }
@@ -470,6 +472,7 @@ export const ORDER_BY_ID_QUERY = `
     order(id: $id) {
       id orderNumber status totalAmount pointsEarned stampsEarned
       pointsRedeemed pointsDiscountNzd stampRedeemed
+      stampMenu { id name }
     }
   }
 `;

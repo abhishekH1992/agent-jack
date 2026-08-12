@@ -312,6 +312,7 @@ export const resolvers = {
         orderBy: { createdAt: "desc" },
         include: {
           table: true,
+          stampMenu: true,
           items: {
             include: { menu: true, menuVariant: true, combo: true },
           },

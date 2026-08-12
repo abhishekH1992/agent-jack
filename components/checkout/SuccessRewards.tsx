@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { SignedIn, SignedOut, SignInButton, useAuth } from "@clerk/nextjs";
+import { money } from "@/lib/cart";
 import { CLERK_ENABLED } from "@/lib/config";
 import { useClerkGql } from "@/lib/clerk-headers";
 import { gql } from "@/lib/graphql";
@@ -12,6 +13,10 @@ type OrderEarn = {
   id: string;
   pointsEarned: number;
   stampsEarned: number;
+  pointsRedeemed: number;
+  pointsDiscountNzd: number;
+  stampRedeemed: boolean;
+  stampMenu?: { id: string; name: string } | null;
 };
 
 export function SuccessRewards({ orderId }: { orderId?: string }) {
@@ -97,8 +102,27 @@ function EarnedCopy({ orderId }: { orderId?: string }) {
     );
   }
 
+  const applied: string[] = [];
+  if (order?.pointsRedeemed) {
+    applied.push(
+      `${order.pointsRedeemed} points (−${money(Number(order.pointsDiscountNzd))})`,
+    );
+  }
+  if (order?.stampRedeemed) {
+    applied.push(
+      order.stampMenu?.name
+        ? `1 free ${order.stampMenu.name}`
+        : "1 free stamp",
+    );
+  }
+
   return (
     <div className="mt-4 space-y-3">
+      {applied.length ? (
+        <p className="text-sm font-semibold">
+          Rewards applied: {applied.join(" · ")}
+        </p>
+      ) : null}
       {bits.length ? (
         <p className="text-sm font-semibold">You earned {bits.join(" and ")}.</p>
       ) : (
