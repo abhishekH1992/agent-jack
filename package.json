@@ -1,0 +1,48 @@
+{
+  "name": "agent-jack",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "dev:server": "npm --prefix server run dev",
+    "dev:all": "npm run dev:server & npm run dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "db:setup": "npm --prefix server run db:setup"
+  },
+  "dependencies": {
+    "@apollo/client": "^3.13.8",
+    "@clerk/nextjs": "^6.22.0",
+    "@heroui/react": "^3.2.3",
+    "@heroui/styles": "^3.2.3",
+    "@react-aria/i18n": "^3.13.1",
+    "@react-aria/ssr": "^3.10.1",
+    "@react-aria/utils": "^3.34.1",
+    "@react-stately/utils": "^3.12.1",
+    "clsx": "^2.1.1",
+    "framer-motion": "^12.43.0",
+    "graphql": "^16.11.0",
+    "js-cookie": "^3.0.5",
+    "next": "15.5.22",
+    "qrcode.react": "^4.2.0",
+    "react": "19.1.0",
+    "react-aria": "^3.51.0",
+    "react-aria-components": "^1.20.0",
+    "react-dom": "19.1.0",
+    "react-hot-toast": "^2.5.2",
+    "socket.io-client": "^4.8.1"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3",
+    "@tailwindcss/postcss": "^4",
+    "@types/js-cookie": "^3.0.6",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "15.5.22",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  }
+}

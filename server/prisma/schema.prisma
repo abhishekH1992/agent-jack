@@ -1,0 +1,336 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Site {
+  id        String   @id @default(cuid())
+  name      String
+  email     String?
+  logo      String?
+  banners   String[] @default([])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Table {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  isActive  Boolean  @default(true)
+  carts     Cart[]
+  orders    Order[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model CategoryType {
+  id         String     @id @default(cuid())
+  name       String     @unique
+  categories Category[]
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+}
+
+model Category {
+  id             String         @id @default(cuid())
+  name           String
+  slug           String         @unique
+  image          String?
+  isEnable       Boolean        @default(true)
+  categoryTypeId String
+  categoryType   CategoryType   @relation(fields: [categoryTypeId], references: [id], onDelete: Cascade)
+  subCategories  SubCategory[]
+  belts          Belt[]
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+}
+
+model SubCategory {
+  id         String   @id @default(cuid())
+  name       String
+  image      String?
+  isEnable   Boolean  @default(true)
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  menus      Menu[]
+  belts      Belt[]
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model Menu {
+  id             String        @id @default(cuid())
+  name           String
+  description    String?
+  image          String?
+  fixedPrice     Decimal       @db.Decimal(10, 2)
+  lowestPrice    Decimal?      @db.Decimal(10, 2)
+  highestPrice   Decimal?      @db.Decimal(10, 2)
+  step           Decimal?      @db.Decimal(10, 2)
+  currentPrice   Decimal?      @db.Decimal(10, 2)
+  pricingEnabled Boolean       @default(false)
+  lastDemandAt   DateTime?
+  cooldownUntil  DateTime?
+  isEnable       Boolean       @default(true)
+  tags           String[]      @default([])
+  subCategoryId  String
+  subCategory    SubCategory   @relation(fields: [subCategoryId], references: [id], onDelete: Cascade)
+  addons         MenuAddon[]
+  variants       MenuVariant[]
+  cartItems      CartItem[]
+  orderItems     OrderItem[]
+  bidAttempts    BidAttempt[]
+  priceEvents    PriceEvent[]
+  chatMessages   ChatMessage[]
+  comboItems     ComboItem[]
+  beltItems      BeltItem[]
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+}
+
+enum BeltSourceType {
+  CATEGORY
+  SUBCATEGORY
+  MENUS
+}
+
+/// Home-page section. Admin picks category, subcategory, or handpicked menus.
+model Belt {
+  id            String         @id @default(cuid())
+  name          String
+  sourceType    BeltSourceType
+  categoryId    String?
+  category      Category?      @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  subCategoryId String?
+  subCategory   SubCategory?   @relation(fields: [subCategoryId], references: [id], onDelete: SetNull)
+  /// false = grid, true = horizontal slider
+  isSlider      Boolean        @default(false)
+  isEnable      Boolean        @default(true)
+  sortOrder     Int            @default(0)
+  items         BeltItem[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+}
+
+model BeltItem {
+  id        String   @id @default(cuid())
+  beltId    String
+  belt      Belt     @relation(fields: [beltId], references: [id], onDelete: Cascade)
+  menuId    String
+  menu      Menu     @relation(fields: [menuId], references: [id], onDelete: Cascade)
+  sortOrder Int      @default(0)
+
+  @@unique([beltId, menuId])
+}
+
+model MenuAddon {
+  id             String          @id @default(cuid())
+  name           String
+  price          Decimal         @db.Decimal(10, 2)
+  menuId         String
+  menu           Menu            @relation(fields: [menuId], references: [id], onDelete: Cascade)
+  cartItemAddons CartItemAddon[]
+  orderItemAddons OrderItemAddon[]
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+}
+
+model MenuVariant {
+  id         String      @id @default(cuid())
+  name       String
+  price      Decimal     @db.Decimal(10, 2)
+  menuId     String
+  menu       Menu        @relation(fields: [menuId], references: [id], onDelete: Cascade)
+  cartItems  CartItem[]
+  orderItems OrderItem[]
+  comboItems ComboItem[]
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+}
+
+model Combo {
+  id          String      @id @default(cuid())
+  name        String
+  description String?
+  image       String?
+  price       Decimal     @db.Decimal(10, 2)
+  isEnable    Boolean     @default(true)
+  items       ComboItem[]
+  cartItems   CartItem[]
+  orderItems  OrderItem[]
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+}
+
+model ComboItem {
+  id            String       @id @default(cuid())
+  comboId       String
+  combo         Combo        @relation(fields: [comboId], references: [id], onDelete: Cascade)
+  menuId        String
+  menu          Menu         @relation(fields: [menuId], references: [id], onDelete: Cascade)
+  menuVariantId String?
+  menuVariant   MenuVariant? @relation(fields: [menuVariantId], references: [id])
+  quantity      Int          @default(1)
+}
+
+model User {
+  id           String       @id @default(cuid())
+  clerkId      String       @unique
+  email        String?
+  name         String?
+  role         String       @default("customer")
+  carts        Cart[]
+  orders       Order[]
+  bidAttempts  BidAttempt[]
+  chatMessages ChatMessage[]
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+}
+
+model Cart {
+  id        String     @id @default(cuid())
+  tableId   String?
+  table     Table?     @relation(fields: [tableId], references: [id])
+  userId    String?
+  user      User?      @relation(fields: [userId], references: [id])
+  guestId   String?
+  note      String?
+  items     CartItem[]
+  orders    Order[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@index([guestId])
+}
+
+model CartItem {
+  id            String          @id @default(cuid())
+  cartId        String
+  cart          Cart            @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  menuId        String?
+  menu          Menu?           @relation(fields: [menuId], references: [id])
+  menuVariantId String?
+  menuVariant   MenuVariant?    @relation(fields: [menuVariantId], references: [id])
+  comboId       String?
+  combo         Combo?          @relation(fields: [comboId], references: [id])
+  quantity      Int             @default(1)
+  salePrice     Decimal         @db.Decimal(10, 2)
+  addons        CartItemAddon[]
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+}
+
+model CartItemAddon {
+  id          String    @id @default(cuid())
+  cartItemId  String
+  cartItem    CartItem  @relation(fields: [cartItemId], references: [id], onDelete: Cascade)
+  menuAddonId String
+  menuAddon   MenuAddon @relation(fields: [menuAddonId], references: [id])
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  CANCELLED
+  FULFILLED
+}
+
+model Order {
+  id              String      @id @default(cuid())
+  orderNumber     String      @unique
+  note            String?
+  tableId         String?
+  table           Table?      @relation(fields: [tableId], references: [id])
+  cartId          String?
+  cart            Cart?       @relation(fields: [cartId], references: [id])
+  userId          String?
+  user            User?       @relation(fields: [userId], references: [id])
+  guestName       String?
+  guestEmail      String?
+  stripeSessionId String?     @unique
+  status          OrderStatus @default(PENDING)
+  totalAmount     Decimal     @db.Decimal(10, 2) @default(0)
+  items           OrderItem[]
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+}
+
+model OrderItem {
+  id            String           @id @default(cuid())
+  orderId       String
+  order         Order            @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  menuId        String?
+  menu          Menu?            @relation(fields: [menuId], references: [id])
+  menuVariantId String?
+  menuVariant   MenuVariant?     @relation(fields: [menuVariantId], references: [id])
+  comboId       String?
+  combo         Combo?           @relation(fields: [comboId], references: [id])
+  quantity      Int              @default(1)
+  salePrice     Decimal          @db.Decimal(10, 2)
+  addons        OrderItemAddon[]
+}
+
+model OrderItemAddon {
+  id          String    @id @default(cuid())
+  orderItemId String
+  orderItem   OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  menuAddonId String
+  menuAddon   MenuAddon @relation(fields: [menuAddonId], references: [id])
+}
+
+model BidAttempt {
+  id        String   @id @default(cuid())
+  menuId    String
+  menu      Menu     @relation(fields: [menuId], references: [id], onDelete: Cascade)
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  sessionId String
+  amount    Decimal  @db.Decimal(10, 2)
+  success   Boolean
+  createdAt DateTime @default(now())
+
+  @@index([sessionId, menuId])
+}
+
+enum PriceEventType {
+  BID
+  COOLDOWN
+  FORCE_MAX
+  FORCE_COOLDOWN
+  ADMIN_SET
+}
+
+model PriceEvent {
+  id        String         @id @default(cuid())
+  menuId    String
+  menu      Menu           @relation(fields: [menuId], references: [id], onDelete: Cascade)
+  type      PriceEventType
+  oldPrice  Decimal        @db.Decimal(10, 2)
+  newPrice  Decimal        @db.Decimal(10, 2)
+  meta      Json?
+  createdAt DateTime       @default(now())
+}
+
+enum ChatRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
+
+model ChatMessage {
+  id        String   @id @default(cuid())
+  menuId    String
+  menu      Menu     @relation(fields: [menuId], references: [id], onDelete: Cascade)
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  sessionId String
+  role      ChatRole
+  content   String
+  createdAt DateTime @default(now())
+
+  @@index([sessionId, menuId])
+}

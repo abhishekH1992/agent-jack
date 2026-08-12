@@ -1,0 +1,30 @@
+# dependencies
+node_modules
+server/node_modules
+
+# next
+.next
+out
+
+# env
+.env
+.env.local
+server/.env
+
+# misc
+.DS_Store
+*.pem
+dist
+server/dist
+qr-restarurant
+
+# uploaded assets (keep folder)
+public/uploads/banners/*
+!public/uploads/banners/.gitkeep
+public/uploads/images/*
+!public/uploads/images/.gitkeep
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*

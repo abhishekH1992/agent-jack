@@ -1,0 +1,322 @@
+@import "tailwindcss";
+@import "@heroui/styles";
+
+:root {
+  /* UI UX Pro Max — Agent Jack (restaurant / mobile-first) */
+  --color-primary: #ea580c;
+  --color-on-primary: #ffffff;
+  --color-secondary: #f97316;
+  --color-accent: #2563eb;
+  --color-background: #fff7ed;
+  --color-foreground: #0f172a;
+  --color-muted-bg: #fdf4f0;
+  --color-muted-fg: #64748b;
+  --color-border: #fceae1;
+  --color-destructive: #dc2626;
+  --color-ring: #ea580c;
+  --color-surface: #ffffff;
+  --color-success: #15803d;
+
+  --space-xs: 0.25rem;
+  --space-sm: 0.5rem;
+  --space-md: 1rem;
+  --space-lg: 1.5rem;
+  --space-xl: 2rem;
+  --space-2xl: 3rem;
+  --space-3xl: 4rem;
+
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05);
+  --shadow-md: 0 4px 6px rgba(15, 23, 42, 0.08);
+  --shadow-lg: 0 10px 15px rgba(15, 23, 42, 0.1);
+  --shadow-xl: 0 20px 25px rgba(15, 23, 42, 0.12);
+
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.25rem;
+  --touch: 44px;
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+  --duration: 200ms;
+
+  /* Legacy aliases used across components */
+  --brand: var(--color-primary);
+  --brand-soft: var(--color-muted-bg);
+  --brand-chat: #ffedd5;
+  --ink: var(--color-foreground);
+  --muted: var(--color-muted-fg);
+  --surface: var(--color-surface);
+  --page: var(--color-background);
+  --line: var(--color-border);
+  --cta: var(--color-accent);
+  --danger: var(--color-destructive);
+  --success: var(--color-success);
+  --shadow: var(--shadow-lg);
+
+  /* HeroUI tokens */
+  --accent: var(--color-primary);
+  --accent-foreground: var(--color-on-primary);
+  --background: var(--color-background);
+  --foreground: var(--color-foreground);
+  --focus: var(--color-ring);
+}
+
+@theme inline {
+  --color-brand: var(--brand);
+  --color-brand-soft: var(--brand-soft);
+  --color-brand-chat: var(--brand-chat);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-page: var(--page);
+  --color-surface: var(--surface);
+  --color-line: var(--line);
+  --color-cta: var(--cta);
+  --font-display: var(--font-display);
+  --font-body: var(--font-body);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  scroll-behavior: smooth;
+}
+
+html,
+body {
+  min-height: 100%;
+  min-height: 100dvh;
+}
+
+body {
+  margin: 0;
+  color: var(--ink);
+  background:
+    radial-gradient(120% 80% at 0% 0%, rgba(234, 88, 12, 0.14), transparent 55%),
+    radial-gradient(90% 60% at 100% 0%, rgba(37, 99, 235, 0.08), transparent 50%),
+    linear-gradient(180deg, #fffaf5 0%, var(--page) 42%, #ffedd5 100%);
+  font-family: var(--font-body), "Karla", sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+  touch-action: manipulation;
+  overscroll-behavior-y: contain;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button,
+[role="button"],
+a,
+label,
+summary {
+  cursor: pointer;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-ring);
+  outline-offset: 2px;
+}
+
+/* Mobile-first shell — full bleed padding, grows at breakpoints */
+.page-shell {
+  width: 100%;
+  max-width: 42rem;
+  margin: 0 auto;
+  padding-inline: 1rem;
+}
+
+@media (min-width: 640px) {
+  .page-shell {
+    max-width: 48rem;
+    padding-inline: 1.25rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .page-shell {
+    max-width: 60rem;
+    padding-inline: 1.5rem;
+  }
+}
+
+.font-display {
+  font-family: var(--font-display), "Playfair Display SC", serif;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: var(--touch);
+  border-radius: 999px;
+  padding: 0.75rem 1.25rem;
+  font-weight: 600;
+  transition:
+    transform var(--duration) var(--ease),
+    opacity var(--duration) var(--ease),
+    background-color var(--duration) var(--ease);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+@media (hover: hover) {
+  .btn:hover {
+    transform: translateY(-1px);
+  }
+}
+
+.btn:active {
+  transform: scale(0.98);
+}
+
+.btn-primary {
+  background: var(--cta);
+  color: #fff;
+}
+
+.btn-secondary {
+  background: var(--surface);
+  border: 2px solid var(--brand);
+  color: var(--brand);
+}
+
+.btn-danger {
+  background: #fff1f2;
+  border: 1px solid #fecdd3;
+  color: var(--danger);
+}
+
+.input {
+  width: 100%;
+  min-height: var(--touch);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  padding: 0.75rem 1rem;
+  font-size: 16px; /* prevents iOS zoom */
+  outline: none;
+  transition:
+    border-color var(--duration) var(--ease),
+    box-shadow var(--duration) var(--ease);
+}
+
+.input:focus {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px rgba(234, 88, 12, 0.2);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.75rem;
+  border-radius: 999px;
+  padding: 0.35rem 0.75rem;
+  background: var(--brand-soft);
+  color: var(--ink);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.surface-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  transition:
+    box-shadow var(--duration) var(--ease),
+    transform var(--duration) var(--ease);
+}
+
+@media (hover: hover) {
+  .surface-card:hover {
+    box-shadow: var(--shadow-lg);
+  }
+}
+
+/* Vibrant block accent */
+.block-accent {
+  background:
+    linear-gradient(135deg, rgba(234, 88, 12, 0.9), rgba(249, 115, 22, 0.75)),
+    repeating-linear-gradient(
+      -12deg,
+      transparent,
+      transparent 10px,
+      rgba(255, 255, 255, 0.06) 10px,
+      rgba(255, 255, 255, 0.06) 20px
+    );
+}
+
+.bid-bubble-ai {
+  background: var(--brand-chat);
+  color: var(--ink);
+  border-radius: var(--radius-lg);
+  border-bottom-left-radius: 0.35rem;
+  padding: 0.875rem 1rem;
+  max-width: min(88%, 22rem);
+  font-size: 0.95rem;
+}
+
+.bid-bubble-user {
+  background: #eff6ff;
+  color: var(--ink);
+  border-radius: var(--radius-lg);
+  border-bottom-right-radius: 0.35rem;
+  padding: 0.875rem 1rem;
+  max-width: min(88%, 22rem);
+  margin-left: auto;
+  font-size: 0.95rem;
+}
+
+.bid-input::-webkit-outer-spin-button,
+.bid-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.bid-input {
+  -moz-appearance: textfield;
+  font-size: 16px;
+}
+
+.admin-shell {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: grid;
+  grid-template-columns: 1fr;
+  background: var(--page);
+  color: var(--ink);
+}
+
+@media (min-width: 900px) {
+  .admin-shell {
+    grid-template-columns: 260px 1fr;
+  }
+}
+
+/* Sticky bottom bars — respect iOS home indicator */
+.safe-bottom {
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+}
