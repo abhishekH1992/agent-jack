@@ -22,12 +22,27 @@ function toNum(v: Prisma.Decimal | number | null | undefined): number {
   return typeof v === "number" ? v : Number(v);
 }
 
-export async function bumpPriceOnBid(menuId: string): Promise<PriceBroadcast> {
+/**
+ * Raise live price after a paid order — one step per unit sold, capped at highestPrice.
+ * Example: qty 2 with step $0.50 → +$1.00 (not a single flat bump).
+ */
+export async function bumpPriceOnOrder(
+  menuId: string,
+  units: number,
+): Promise<PriceBroadcast | null> {
+  const qty = Math.max(0, Math.floor(Number(units) || 0));
+  if (qty < 1) return null;
+
   const menu = await prisma.menu.findUniqueOrThrow({ where: { id: menuId } });
+  if (!menu.pricingEnabled) return null;
+
   const current = toNum(menu.currentPrice ?? menu.fixedPrice);
   const max = toNum(menu.highestPrice ?? menu.fixedPrice);
   const step = toNum(menu.step ?? 0.5);
-  const next = Math.min(max, Number((current + step).toFixed(2)));
+  if (current >= max) return broadcastFromMenu(menu);
+
+  const next = Math.min(max, Number((current + step * qty).toFixed(2)));
+  if (next === current) return broadcastFromMenu(menu);
 
   const updated = await prisma.menu.update({
     where: { id: menuId },

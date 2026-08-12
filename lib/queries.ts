@@ -276,6 +276,7 @@ export const PLACE_BID = `
     $amount: Float!
     $cartId: ID!
     $sessionId: String!
+    $quantity: Int
     $chatAttempt: Int
     $lastReply: String
   ) {
@@ -284,6 +285,7 @@ export const PLACE_BID = `
       amount: $amount
       cartId: $cartId
       sessionId: $sessionId
+      quantity: $quantity
       chatAttempt: $chatAttempt
       lastReply: $lastReply
     ) {
@@ -323,10 +325,30 @@ export const LIQUOR_MENUS = `
 
 export const ORDERS_QUERY = `
   query Orders {
-    orders(limit: 40) {
-      id orderNumber status totalAmount guestName createdAt
+    orders(limit: 100) {
+      id orderNumber status totalAmount guestName guestEmail note createdAt
       table { id name }
-      items { id quantity salePrice menu { id name } }
+      items {
+        id quantity salePrice
+        menu { id name pricingEnabled }
+        menuVariant { id name }
+        combo { id name }
+      }
+    }
+  }
+`;
+
+export const MY_ORDERS_QUERY = `
+  query MyOrders {
+    myOrders(limit: 50) {
+      id orderNumber status totalAmount guestName guestEmail note createdAt
+      table { id name }
+      items {
+        id quantity salePrice
+        menu { id name pricingEnabled }
+        menuVariant { id name }
+        combo { id name }
+      }
     }
   }
 `;

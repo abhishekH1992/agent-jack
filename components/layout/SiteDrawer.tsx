@@ -17,7 +17,7 @@ const links = [
   { href: "/menu", label: "Menu" },
   { href: "/liquor", label: "Liquor menu" },
   { href: "/cart", label: "Cart", showCount: true },
-  { href: "/orders", label: "Order" },
+  { href: "/orders", label: "Orders", signedInOnly: true },
   { href: "/privacy-policy", label: "Privacy Policy" },
   { href: "/terms-and-conditions", label: "Terms and Conditions" },
 ];
@@ -147,9 +147,8 @@ export function SiteDrawer({
           {links.map((link) => {
             const active =
               pathname === link.href || pathname.startsWith(`${link.href}/`);
-            return (
+            const row = (
               <Link
-                key={link.href}
                 href={link.href}
                 className={clsx(
                   "flex items-center justify-between rounded-xl px-4 py-3.5 text-base font-semibold transition",
@@ -166,6 +165,12 @@ export function SiteDrawer({
                 ) : null}
               </Link>
             );
+
+            if (link.signedInOnly) {
+              if (!CLERK_ENABLED) return null;
+              return <SignedIn key={link.href}>{row}</SignedIn>;
+            }
+            return <div key={link.href}>{row}</div>;
           })}
         </nav>
 

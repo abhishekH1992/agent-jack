@@ -61,3 +61,10 @@ export function requireAdmin(ctx: GraphQLContext) {
     throw new Error("Admin access required");
   }
 }
+
+export function requireUser(ctx: GraphQLContext) {
+  if (!ctx.user) {
+    throw new Error("Sign in required");
+  }
+  return ctx.user;
+}

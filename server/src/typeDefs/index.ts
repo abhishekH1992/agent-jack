@@ -250,6 +250,8 @@ export const typeDefs = `#graphql
     pageBySlug(slug: String!): Page
     getCart(id: ID!): Cart
     orders(limit: Int): [Order!]!
+    # Logged-in customer's own orders (by userId or matching guest email)
+    myOrders(limit: Int): [Order!]!
     order(id: ID!): Order
     me: User
   }
@@ -391,6 +393,8 @@ export const typeDefs = `#graphql
       amount: Float!
       cartId: ID!
       sessionId: String!
+      # Units to add on a winning bid (price still only rises after paid checkout)
+      quantity: Int
       # 1-based fail attempt in this modal (for chat tone); omit on success / accept-offer
       chatAttempt: Int
       # Last assistant line — model must not repeat it

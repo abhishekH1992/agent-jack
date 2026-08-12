@@ -1,8 +1,8 @@
 import { GraphQLScalarType, Kind } from "graphql";
 import { prisma } from "../prisma.js";
-import { GraphQLContext, requireAdmin } from "../context.js";
+import { GraphQLContext, requireAdmin, requireUser } from "../context.js";
 import { generateBidChatReply } from "../services/openai.js";
-import { adminForcePrice, bumpPriceOnBid } from "../services/pricing.js";
+import { adminForcePrice } from "../services/pricing.js";
 import { createCheckoutSession } from "../services/stripe.js";
 import {
   beltInclude,
@@ -221,6 +221,41 @@ export const resolvers = {
         })),
       }));
     },
+    myOrders: async (
+      _: unknown,
+      { limit }: { limit?: number },
+      ctx: GraphQLContext,
+    ) => {
+      const user = requireUser(ctx);
+      const email = user.email?.trim().toLowerCase() || null;
+      const orders = await prisma.order.findMany({
+        where: {
+          OR: [
+            { userId: user.id },
+            ...(email
+              ? [{ guestEmail: { equals: email, mode: "insensitive" as const } }]
+              : []),
+          ],
+        },
+        take: limit || 50,
+        orderBy: { createdAt: "desc" },
+        include: {
+          table: true,
+          items: {
+            include: { menu: true, menuVariant: true, combo: true },
+          },
+        },
+      });
+      return orders.map((o) => ({
+        ...o,
+        totalAmount: Number(o.totalAmount),
+        items: o.items.map((i) => ({
+          ...i,
+          salePrice: Number(i.salePrice),
+          menu: i.menu ? mapMenu(i.menu) : null,
+        })),
+      }));
+    },
     order: async (_: unknown, { id }: { id: string }) => {
       const o = await prisma.order.findUnique({
         where: { id },
@@ -321,6 +356,7 @@ export const resolvers = {
         sessionId,
         chatAttempt,
         lastReply,
+        quantity,
       }: {
         menuId: string;
         amount: number;
@@ -328,6 +364,7 @@ export const resolvers = {
         sessionId: string;
         chatAttempt?: number | null;
         lastReply?: string | null;
+        quantity?: number | null;
       },
       ctx: GraphQLContext,
     ) => {
@@ -335,6 +372,7 @@ export const resolvers = {
       if (!Number.isFinite(rounded) || rounded < 0) {
         throw new Error("Invalid bid amount");
       }
+      const qty = Math.min(99, Math.max(1, Math.floor(Number(quantity) || 1)));
       const menu = await prisma.menu.findUniqueOrThrow({
         where: { id: menuId },
         include: menuInclude,
@@ -373,11 +411,12 @@ export const resolvers = {
 
       let cartItem = null;
       if (success) {
+        // Price stays put until the order is paid — then bump by qty × step
         cartItem = await prisma.cartItem.create({
           data: {
             cartId,
             menuId,
-            quantity: 1,
+            quantity: qty,
             salePrice: rounded,
           },
           include: {
@@ -387,7 +426,6 @@ export const resolvers = {
             addons: { include: { menuAddon: true } },
           },
         });
-        await bumpPriceOnBid(menuId);
       }
 
       const refreshed = await prisma.menu.findUniqueOrThrow({

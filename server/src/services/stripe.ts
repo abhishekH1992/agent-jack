@@ -1,5 +1,6 @@
 import Stripe from "stripe";
 import { prisma } from "../prisma.js";
+import { bumpPriceOnOrder } from "./pricing.js";
 
 export function getStripe() {
   const key = process.env.STRIPE_SECRET_KEY;
@@ -123,10 +124,36 @@ export async function handleCheckoutCompleted(session: Stripe.Checkout.Session) 
   const orderId = session.metadata?.orderId;
   if (!orderId) return;
 
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    include: {
+      items: { include: { menu: true } },
+    },
+  });
+  if (!order) return;
+
+  // Idempotent — Stripe may retry webhooks
+  if (order.status === "PAID" || order.status === "FULFILLED") {
+    return;
+  }
+
   await prisma.order.update({
     where: { id: orderId },
     data: { status: "PAID" },
   });
+
+  // Liquor live price rises only after paid order, by total qty per menu
+  const qtyByMenu = new Map<string, number>();
+  for (const item of order.items) {
+    if (!item.menuId || !item.menu?.pricingEnabled) continue;
+    qtyByMenu.set(
+      item.menuId,
+      (qtyByMenu.get(item.menuId) || 0) + item.quantity,
+    );
+  }
+  for (const [menuId, units] of qtyByMenu) {
+    await bumpPriceOnOrder(menuId, units);
+  }
 
   const cartId = session.metadata?.cartId;
   if (cartId) {

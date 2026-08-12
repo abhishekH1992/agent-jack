@@ -26,7 +26,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
     <div className="admin-shell">
       <aside
         className={clsx(
-          "fixed inset-y-0 left-0 z-40 flex w-[260px] flex-col border-r border-[var(--line)] bg-white p-5 transition-transform md:static md:translate-x-0",
+          "fixed inset-y-0 left-0 z-40 flex w-[260px] flex-col border-r border-[var(--line)] bg-white p-5 transition-transform print:hidden md:static md:translate-x-0",
           open ? "translate-x-0" : "-translate-x-full",
         )}
       >
@@ -87,7 +87,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
       </aside>
 
       <div className="min-w-0">
-        <div className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-[var(--line)] bg-[rgba(250,250,247,0.92)] px-4 py-3 backdrop-blur md:px-6">
+        <div className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-[var(--line)] bg-[rgba(250,250,247,0.92)] px-4 py-3 backdrop-blur print:hidden md:px-6">
           <div className="flex items-center gap-3">
             <div className="h-1.5 w-16 rounded-full bg-[var(--brand)] md:hidden" />
             <Button
@@ -109,7 +109,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
             onClick={() => setOpen(false)}
           />
         )}
-        <div className="p-4 md:p-6">{children}</div>
+        <div className="p-4 print:p-0 md:p-6">{children}</div>
       </div>
     </div>
   );

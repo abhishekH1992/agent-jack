@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useAuth, useUser } from "@clerk/nextjs";
 import { Button, Card } from "@heroui/react";
 import toast from "react-hot-toast";
 import {
@@ -11,12 +12,37 @@ import {
   money,
   setTableId,
 } from "@/lib/cart";
+import { CLERK_ENABLED } from "@/lib/config";
+import { clerkAuthHeaders } from "@/lib/clerk-headers";
 import { gql } from "@/lib/graphql";
 import { CHECKOUT, TABLES_QUERY, UPDATE_CART } from "@/lib/queries";
 import { useCart } from "@/components/cart/CartProvider";
 import { CheckoutAuth } from "@/components/checkout/CheckoutAuth";
 
 export function CheckoutForm() {
+  if (CLERK_ENABLED) return <CheckoutFormAuthed />;
+  return <CheckoutFormBase authHeaders={{}} />;
+}
+
+function CheckoutFormAuthed() {
+  const { isSignedIn, userId } = useAuth();
+  const { user } = useUser();
+  const headers =
+    isSignedIn && userId
+      ? clerkAuthHeaders({
+          userId,
+          email: user?.primaryEmailAddress?.emailAddress,
+          name: user?.fullName,
+        })
+      : {};
+  return <CheckoutFormBase authHeaders={headers} />;
+}
+
+function CheckoutFormBase({
+  authHeaders,
+}: {
+  authHeaders: Record<string, string>;
+}) {
   const { cart, refresh } = useCart();
   const [tables, setTables] = useState<{ id: string; name: string }[]>([]);
   const [tableId, setTable] = useState(getTableId() || "");
@@ -44,18 +70,22 @@ export function CheckoutForm() {
     setBusy(true);
     try {
       setTableId(tableId);
-      await gql(UPDATE_CART, { id: cart.id, tableId });
+      await gql(UPDATE_CART, { id: cart.id, tableId }, authHeaders);
       const origin = window.location.origin;
       const data = await gql<{
         createCheckoutSession: { url: string | null; orderId: string };
-      }>(CHECKOUT, {
-        cartId: cart.id,
-        tableId,
-        guestName,
-        guestEmail,
-        successUrl: `${origin}/success?session_id={CHECKOUT_SESSION_ID}`,
-        cancelUrl: `${origin}/checkout`,
-      });
+      }>(
+        CHECKOUT,
+        {
+          cartId: cart.id,
+          tableId,
+          guestName,
+          guestEmail,
+          successUrl: `${origin}/success?session_id={CHECKOUT_SESSION_ID}`,
+          cancelUrl: `${origin}/checkout`,
+        },
+        authHeaders,
+      );
 
       if (!data.createCheckoutSession.url) {
         toast.error(

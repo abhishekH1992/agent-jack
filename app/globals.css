@@ -348,3 +348,34 @@ summary {
 .safe-bottom {
   padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
 }
+
+@media print {
+  body {
+    background: white !important;
+    color: black !important;
+  }
+
+  .admin-shell {
+    display: block;
+    min-height: 0;
+    background: white;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .print-ticket {
+    display: block !important;
+    max-width: 80mm;
+    margin: 0 auto;
+    color: black;
+    font-size: 12px;
+  }
+
+  .print-ticket * {
+    color: black !important;
+    box-shadow: none !important;
+    background: transparent !important;
+  }
+}
