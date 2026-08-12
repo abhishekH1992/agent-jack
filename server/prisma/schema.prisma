@@ -72,6 +72,10 @@ model Menu {
   highestPrice   Decimal?      @db.Decimal(10, 2)
   step           Decimal?      @db.Decimal(10, 2)
   currentPrice   Decimal?      @db.Decimal(10, 2)
+  /// Units that must sell (paid) before live price rises by one step
+  unitsPerStep   Int           @default(5)
+  /// Progress toward the next step bump (0 .. unitsPerStep-1)
+  demandUnits    Int           @default(0)
   pricingEnabled Boolean       @default(false)
   lastDemandAt   DateTime?
   cooldownUntil  DateTime?

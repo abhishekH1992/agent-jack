@@ -414,6 +414,8 @@ async function main() {
             highestPrice: sub.liquor ? Number((base + 5).toFixed(2)) : null,
             currentPrice: base,
             step: sub.liquor ? 0.5 : null,
+            unitsPerStep: sub.liquor ? 5 : 5,
+            demandUnits: 0,
             pricingEnabled: Boolean(sub.liquor),
             isEnable: true,
             subCategoryId: subCategory.id,

@@ -151,7 +151,7 @@ export const ADMIN_CATALOG_QUERY = `
         id name image isEnable categoryId
         menus {
           id name description image fixedPrice currentPrice lowestPrice highestPrice
-          step pricingEnabled isEnable tags subCategoryId
+          step unitsPerStep demandUnits pricingEnabled isEnable tags subCategoryId
           variants { id name price }
           addons { id name price }
         }
@@ -206,7 +206,7 @@ export const STORE_MENU = `
   mutation StoreMenu($input: MenuInput!) {
     storeMenu(input: $input) {
       id name description image fixedPrice currentPrice lowestPrice highestPrice
-      step pricingEnabled isEnable tags
+      step unitsPerStep demandUnits pricingEnabled isEnable tags
       variants { id name price }
       addons { id name price }
     }
@@ -217,7 +217,7 @@ export const UPDATE_MENU = `
   mutation UpdateMenu($id: ID!, $input: MenuInput!) {
     updateMenu(id: $id, input: $input) {
       id name description image fixedPrice currentPrice lowestPrice highestPrice
-      step pricingEnabled isEnable tags
+      step unitsPerStep demandUnits pricingEnabled isEnable tags
       variants { id name price }
       addons { id name price }
     }
@@ -237,9 +237,9 @@ export const GET_CART = `
       table { id name }
       items {
         id quantity salePrice
-        menu { id name pricingEnabled }
+        menu { id name image pricingEnabled }
         menuVariant { id name }
-        combo { id name }
+        combo { id name image }
         addons { id menuAddon { id name price } }
       }
     }

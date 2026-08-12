@@ -411,7 +411,7 @@ export const resolvers = {
 
       let cartItem = null;
       if (success) {
-        // Price stays put until the order is paid — then bump by qty × step
+        // Price stays put until paid; then units accumulate toward unitsPerStep
         cartItem = await prisma.cartItem.create({
           data: {
             cartId,

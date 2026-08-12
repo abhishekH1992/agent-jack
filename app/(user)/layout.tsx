@@ -3,12 +3,17 @@ import { StickyCartBar } from "@/components/layout/StickyCartBar";
 import { gql } from "@/lib/graphql";
 import { SITE_QUERY } from "@/lib/queries";
 
-async function getSiteName() {
+async function getSite() {
   try {
-    const data = await gql<{ site: { name: string } | null }>(SITE_QUERY);
-    return data.site?.name || "Agent Jack";
+    const data = await gql<{
+      site: { name?: string | null; logo?: string | null } | null;
+    }>(SITE_QUERY);
+    return {
+      siteName: data.site?.name?.trim() || "Agent Jack",
+      siteLogo: data.site?.logo?.trim() || null,
+    };
   } catch {
-    return "Agent Jack";
+    return { siteName: "Agent Jack", siteLogo: null };
   }
 }
 
@@ -17,10 +22,10 @@ export default async function UserLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const siteName = await getSiteName();
+  const { siteName, siteLogo } = await getSite();
   return (
     <div className="min-h-screen">
-      <Header siteName={siteName} />
+      <Header siteName={siteName} siteLogo={siteLogo} />
       <main>{children}</main>
       <StickyCartBar />
     </div>

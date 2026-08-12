@@ -26,11 +26,11 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
     <div className="admin-shell">
       <aside
         className={clsx(
-          "fixed inset-y-0 left-0 z-40 flex w-[260px] flex-col border-r border-[var(--line)] bg-white p-5 transition-transform print:hidden md:static md:translate-x-0",
+          "fixed inset-y-0 left-0 z-40 flex h-dvh max-h-dvh w-[260px] flex-col border-r border-[var(--line)] bg-white transition-transform print:hidden md:sticky md:top-0 md:translate-x-0",
           open ? "translate-x-0" : "-translate-x-full",
         )}
       >
-        <div className="mb-8 flex items-center justify-between">
+        <div className="flex shrink-0 items-center justify-between px-5 pb-4 pt-5">
           <div>
             <div
               className="text-xl font-extrabold"
@@ -51,7 +51,8 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
             Close
           </Button>
         </div>
-        <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto">
+
+        <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain px-5 pb-3">
           {links.map((link) => {
             const active =
               link.href === "/admin"
@@ -74,7 +75,8 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
             );
           })}
         </nav>
-        <div className="mt-6 space-y-2 border-t border-[var(--line)] pt-4">
+
+        <div className="mt-auto shrink-0 space-y-2 border-t border-[var(--line)] bg-white px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-4">
           <Link
             href="/"
             className="block rounded-xl px-3 py-2.5 text-sm text-[var(--muted)] transition hover:bg-[#f5f3ec] hover:text-[var(--ink)]"

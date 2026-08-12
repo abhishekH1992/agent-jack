@@ -15,6 +15,8 @@ export function mapMenu(menu: any) {
     highestPrice: dec(menu.highestPrice),
     step: dec(menu.step),
     currentPrice: dec(menu.currentPrice),
+    unitsPerStep: Number(menu.unitsPerStep ?? 5),
+    demandUnits: Number(menu.demandUnits ?? 0),
     addons: menu.addons?.map((a: any) => ({ ...a, price: Number(a.price) })),
     variants: menu.variants?.map((v: any) => ({ ...v, price: Number(v.price) })),
   };
@@ -37,6 +39,10 @@ export function menuWriteData(input: any) {
       input.currentPrice == null
         ? Number(input.fixedPrice)
         : Number(input.currentPrice),
+    unitsPerStep: Math.max(
+      1,
+      Math.floor(Number(input.unitsPerStep) || 5),
+    ),
     pricingEnabled: Boolean(input.pricingEnabled),
     isEnable: input.isEnable !== false,
     tags: Array.isArray(input.tags)

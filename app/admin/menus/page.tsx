@@ -34,6 +34,7 @@ type Form = {
   highestPrice: string;
   step: string;
   currentPrice: string;
+  unitsPerStep: string;
   pricingEnabled: boolean;
   isEnable: boolean;
   tags: string[];
@@ -51,6 +52,7 @@ const empty = (): Form => ({
   highestPrice: "",
   step: "0.5",
   currentPrice: "",
+  unitsPerStep: "5",
   pricingEnabled: false,
   isEnable: true,
   tags: [],
@@ -270,6 +272,7 @@ export default function AdminMenusPage() {
       step: menu.step == null ? "0.5" : String(menu.step),
       currentPrice:
         menu.currentPrice == null ? "" : String(menu.currentPrice),
+      unitsPerStep: String(menu.unitsPerStep ?? 5),
       pricingEnabled: Boolean(menu.pricingEnabled),
       isEnable: Boolean(menu.isEnable),
       tags: [...(menu.tags || [])],
@@ -305,6 +308,9 @@ export default function AdminMenusPage() {
         currentPrice: liquor
           ? (numOrNull(form.currentPrice) ?? fixedPrice)
           : fixedPrice,
+        unitsPerStep: liquor
+          ? Math.max(1, Math.floor(Number(form.unitsPerStep) || 5))
+          : 5,
         pricingEnabled: liquor ? form.pricingEnabled : false,
         isEnable: form.isEnable,
         tags: form.tags,
@@ -600,6 +606,23 @@ export default function AdminMenusPage() {
                       setForm((f) => ({ ...f, step: e.target.value }))
                     }
                   />
+                </label>
+                <label className="block space-y-1 sm:col-span-2">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
+                    Units per step
+                  </span>
+                  <input
+                    className="input"
+                    inputMode="numeric"
+                    value={form.unitsPerStep}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, unitsPerStep: e.target.value }))
+                    }
+                  />
+                  <span className="text-xs text-[var(--muted)]">
+                    Paid units needed before live price rises by one step (e.g.
+                    5 sold → +$0.50).
+                  </span>
                 </label>
               </>
             ) : null}

@@ -50,6 +50,10 @@ export const typeDefs = `#graphql
     highestPrice: Float
     step: Float
     currentPrice: Float
+    # Paid units needed before live price rises by one step (default 5)
+    unitsPerStep: Int!
+    # Progress toward next step (0 .. unitsPerStep-1)
+    demandUnits: Int!
     pricingEnabled: Boolean!
     isEnable: Boolean!
     tags: [String!]!
@@ -303,6 +307,7 @@ export const typeDefs = `#graphql
     highestPrice: Float
     step: Float
     currentPrice: Float
+    unitsPerStep: Int
     pricingEnabled: Boolean
     isEnable: Boolean
     tags: [String!]

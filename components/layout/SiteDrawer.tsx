@@ -55,11 +55,14 @@ export function SiteDrawer({
   open,
   onClose,
   siteName,
+  siteLogo = null,
 }: {
   open: boolean;
   onClose: () => void;
   siteName: string;
+  siteLogo?: string | null;
 }) {
+  const hasLogo = Boolean(siteLogo?.trim());
   const pathname = usePathname();
   const { itemCount } = useCart();
 
@@ -109,13 +112,22 @@ export function SiteDrawer({
         aria-label="Site menu"
       >
         <div className="flex items-center justify-between border-b border-[var(--line)] px-5 py-4 pt-[max(1rem,env(safe-area-inset-top))]">
-          <div>
-            <div
-              className="text-xl font-bold"
-              style={{ fontFamily: "var(--font-display), serif" }}
-            >
-              {siteName}
-            </div>
+          <div className="min-w-0">
+            {hasLogo ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={siteLogo!}
+                alt={siteName}
+                className="h-9 w-auto max-w-[180px] object-contain"
+              />
+            ) : (
+              <div
+                className="truncate text-xl font-bold"
+                style={{ fontFamily: "var(--font-display), serif" }}
+              >
+                {siteName}
+              </div>
+            )}
             <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
               Navigate
             </div>
