@@ -164,6 +164,34 @@ summary {
   font-family: var(--font-display), "Playfair Display SC", serif;
 }
 
+.prose-page p {
+  margin: 0 0 1rem;
+  line-height: 1.7;
+  color: var(--ink);
+}
+
+.prose-page h2 {
+  margin: 1.5rem 0 0.75rem;
+  font-family: var(--font-display), serif;
+  font-size: 1.5rem;
+}
+
+.prose-page h3 {
+  margin: 1.25rem 0 0.5rem;
+  font-size: 1.125rem;
+  font-weight: 700;
+}
+
+.prose-page ul {
+  margin: 0 0 1rem 1.25rem;
+  list-style: disc;
+}
+
+.prose-page a {
+  color: var(--cta);
+  text-decoration: underline;
+}
+
 .btn {
   display: inline-flex;
   align-items: center;

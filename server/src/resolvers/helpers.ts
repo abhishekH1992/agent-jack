@@ -113,6 +113,98 @@ export function mapBelt(belt: any, menus: any[]) {
   };
 }
 
+export const pageInclude = {
+  blocks: {
+    orderBy: { sortOrder: "asc" as const },
+    include: {
+      belt: { include: beltInclude },
+    },
+  },
+} as const;
+
+export async function mapPage(page: any) {
+  const blocks = await Promise.all(
+    (page.blocks || []).map(async (block: any) => {
+      if (block.type === "BELT" && block.belt) {
+        const menus = await resolveBeltMenus(block.belt);
+        return {
+          ...block,
+          belt: mapBelt(block.belt, menus),
+        };
+      }
+      return { ...block, belt: block.belt ? mapBelt(block.belt, []) : null };
+    }),
+  );
+  return { ...page, blocks };
+}
+
+export async function persistPage(input: any, id?: string) {
+  const title = String(input.title || "").trim();
+  if (!title) throw new Error("Page title is required");
+  const slug = slugifyPage(input.slug || title);
+  if (!slug) throw new Error("Page slug is required");
+
+  const blocks: any[] = Array.isArray(input.blocks) ? input.blocks : [];
+  const data = {
+    title,
+    slug,
+    isEnable: input.isEnable ?? true,
+    sortOrder: input.sortOrder ?? 0,
+  };
+
+  if (id) {
+    await prisma.pageBlock.deleteMany({ where: { pageId: id } });
+    const page = await prisma.page.update({
+      where: { id },
+      data: {
+        ...data,
+        blocks: {
+          create: blocks.map((b, index) => ({
+            type: b.type,
+            sortOrder: b.sortOrder ?? index,
+            isEnable: b.isEnable ?? true,
+            images: b.images || [],
+            imageLayout: b.imageLayout || null,
+            isBanner: Boolean(b.isBanner),
+            content: b.content || null,
+            beltId: b.type === "BELT" ? b.beltId || null : null,
+          })),
+        },
+      },
+      include: pageInclude,
+    });
+    return mapPage(page);
+  }
+
+  const page = await prisma.page.create({
+    data: {
+      ...data,
+      blocks: {
+        create: blocks.map((b, index) => ({
+          type: b.type,
+          sortOrder: b.sortOrder ?? index,
+          isEnable: b.isEnable ?? true,
+          images: b.images || [],
+          imageLayout: b.imageLayout || null,
+          isBanner: Boolean(b.isBanner),
+          content: b.content || null,
+          beltId: b.type === "BELT" ? b.beltId || null : null,
+        })),
+      },
+    },
+    include: pageInclude,
+  });
+  return mapPage(page);
+}
+
+function slugifyPage(s: string) {
+  return s
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
+}
+
 export async function persistBelt(input: any, id?: string) {
   validateBeltInput(input);
 

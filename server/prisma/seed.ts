@@ -315,6 +315,8 @@ async function main() {
   await prisma.cart.deleteMany();
   await prisma.comboItem.deleteMany();
   await prisma.combo.deleteMany();
+  await prisma.pageBlock.deleteMany();
+  await prisma.page.deleteMany();
   await prisma.beltItem.deleteMany();
   await prisma.belt.deleteMany();
   await prisma.menuAddon.deleteMany();
@@ -463,7 +465,7 @@ async function main() {
     }
   }
 
-  await prisma.belt.create({
+  const basicsBelt = await prisma.belt.create({
     data: {
       name: "The Basics",
       sourceType: "CATEGORY",
@@ -474,7 +476,7 @@ async function main() {
     },
   });
 
-  await prisma.belt.create({
+  const burgersBelt = await prisma.belt.create({
     data: {
       name: "Burgers",
       sourceType: "SUBCATEGORY",
@@ -485,7 +487,7 @@ async function main() {
     },
   });
 
-  await prisma.belt.create({
+  const chefBelt = await prisma.belt.create({
     data: {
       name: "Chef picks",
       sourceType: "MENUS",
@@ -500,8 +502,9 @@ async function main() {
     },
   });
 
+  let liquorBeltId: string | null = null;
   if (liquorCategoryId) {
-    await prisma.belt.create({
+    const liquorBelt = await prisma.belt.create({
       data: {
         name: "On tap — live prices",
         sourceType: "CATEGORY",
@@ -511,9 +514,124 @@ async function main() {
         sortOrder: 3,
       },
     });
+    liquorBeltId = liquorBelt.id;
   }
 
-  console.log("Seed complete (tmp images → public/uploads)");
+  // CMS pages — belts attach here
+  await prisma.page.create({
+    data: {
+      title: "Home",
+      slug: "home",
+      isEnable: true,
+      sortOrder: 0,
+      blocks: {
+        create: [
+          {
+            type: "IMAGE",
+            sortOrder: 0,
+            isEnable: true,
+            images: banners,
+            imageLayout: "SLIDER",
+            isBanner: true,
+          },
+          {
+            type: "BELT",
+            sortOrder: 1,
+            isEnable: true,
+            beltId: basicsBelt.id,
+          },
+          {
+            type: "BELT",
+            sortOrder: 2,
+            isEnable: true,
+            beltId: burgersBelt.id,
+          },
+          {
+            type: "BELT",
+            sortOrder: 3,
+            isEnable: true,
+            beltId: chefBelt.id,
+          },
+          ...(liquorBeltId
+            ? [
+                {
+                  type: "BELT" as const,
+                  sortOrder: 4,
+                  isEnable: true,
+                  beltId: liquorBeltId,
+                },
+              ]
+            : []),
+        ],
+      },
+    },
+  });
+
+  await prisma.page.create({
+    data: {
+      title: "Privacy Policy",
+      slug: "privacy-policy",
+      isEnable: true,
+      sortOrder: 0,
+      blocks: {
+        create: [
+          {
+            type: "RICH_TEXT",
+            sortOrder: 0,
+            isEnable: true,
+            content: `
+<h2>Privacy Policy</h2>
+<p>Agent Jack ("we", "us") respects your privacy when you order from our restaurant via QR codes and our web app.</p>
+<h3>Information we collect</h3>
+<ul>
+  <li>Table and order details you submit at checkout</li>
+  <li>Optional account details if you sign in (name, email)</li>
+  <li>Device and usage data needed to run bidding and payments</li>
+</ul>
+<h3>How we use information</h3>
+<p>We use your information to process orders, take payments, improve the menu experience, and meet legal obligations.</p>
+<h3>Sharing</h3>
+<p>We share data with payment providers (e.g. Stripe) and authentication providers (e.g. Clerk) only as needed to operate the service.</p>
+<h3>Contact</h3>
+<p>Questions? Email <a href="mailto:hello@agentjack.local">hello@agentjack.local</a>.</p>
+`.trim(),
+          },
+        ],
+      },
+    },
+  });
+
+  await prisma.page.create({
+    data: {
+      title: "Terms and Conditions",
+      slug: "terms-and-conditions",
+      isEnable: true,
+      sortOrder: 0,
+      blocks: {
+        create: [
+          {
+            type: "RICH_TEXT",
+            sortOrder: 0,
+            isEnable: true,
+            content: `
+<h2>Terms and Conditions</h2>
+<p>By using Agent Jack ordering and liquor bidding, you agree to these terms.</p>
+<h3>Orders & payment</h3>
+<p>Prices shown at checkout are final for food items. Liquor bid prices may change with demand until your bid succeeds. Payment is processed securely via our payment provider.</p>
+<h3>Table responsibility</h3>
+<p>Orders placed from a table QR are associated with that table. Please confirm your table before paying.</p>
+<h3>Acceptable use</h3>
+<p>Do not abuse bidding, attempt to interfere with pricing systems, or misuse other guests' sessions.</p>
+<h3>Changes</h3>
+<p>We may update these terms from time to time. Continued use of the service means you accept the updated terms.</p>
+`.trim(),
+          },
+        ],
+      },
+    },
+  });
+
+  console.log("Seed complete (pages + tmp images → public/uploads)");
 }
 
 main()

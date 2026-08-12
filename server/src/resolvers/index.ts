@@ -11,8 +11,11 @@ import {
   dec,
   mapBelt,
   mapMenu,
+  mapPage,
   menuInclude,
+  pageInclude,
   persistBelt,
+  persistPage,
   resolveBeltMenus,
 } from "./helpers.js";
 
@@ -149,6 +152,29 @@ export const resolvers = {
           return mapBelt(belt, menus);
         }),
       );
+    },
+    pages: async (_: unknown, { isEnable }: { isEnable?: boolean }) => {
+      const pages = await prisma.page.findMany({
+        where: isEnable == null ? undefined : { isEnable },
+        orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+        include: pageInclude,
+      });
+      return Promise.all(pages.map((page) => mapPage(page)));
+    },
+    page: async (_: unknown, { id }: { id: string }) => {
+      const page = await prisma.page.findUnique({
+        where: { id },
+        include: pageInclude,
+      });
+      return page ? mapPage(page) : null;
+    },
+    pageBySlug: async (_: unknown, { slug }: { slug: string }) => {
+      const page = await prisma.page.findUnique({
+        where: { slug },
+        include: pageInclude,
+      });
+      if (!page || !page.isEnable) return null;
+      return mapPage(page);
     },
     getCart: async (_: unknown, { id }: { id: string }) => {
       const cart = await prisma.cart.findUnique({
@@ -649,6 +675,23 @@ export const resolvers = {
     deleteBelt: async (_: unknown, { id }: { id: string }, ctx: GraphQLContext) => {
       requireAdmin(ctx);
       await prisma.belt.delete({ where: { id } });
+      return true;
+    },
+    storePage: async (_: unknown, { input }: { input: any }, ctx: GraphQLContext) => {
+      requireAdmin(ctx);
+      return persistPage(input);
+    },
+    updatePage: async (
+      _: unknown,
+      { id, input }: { id: string; input: any },
+      ctx: GraphQLContext,
+    ) => {
+      requireAdmin(ctx);
+      return persistPage(input, id);
+    },
+    deletePage: async (_: unknown, { id }: { id: string }, ctx: GraphQLContext) => {
+      requireAdmin(ctx);
+      await prisma.page.delete({ where: { id } });
       return true;
     },
     adminForcePrice: async (

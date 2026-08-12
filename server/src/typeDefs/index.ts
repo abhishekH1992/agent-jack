@@ -115,6 +115,40 @@ export const typeDefs = `#graphql
     menus: [Menu!]!
   }
 
+  enum PageBlockType {
+    IMAGE
+    RICH_TEXT
+    BELT
+  }
+
+  enum ImageLayout {
+    SINGLE
+    COLUMN
+    SLIDER
+  }
+
+  type PageBlock {
+    id: ID!
+    type: PageBlockType!
+    sortOrder: Int!
+    isEnable: Boolean!
+    images: [String!]!
+    imageLayout: ImageLayout
+    isBanner: Boolean!
+    content: String
+    beltId: ID
+    belt: Belt
+  }
+
+  type Page {
+    id: ID!
+    title: String!
+    slug: String!
+    isEnable: Boolean!
+    sortOrder: Int!
+    blocks: [PageBlock!]!
+  }
+
   type CartItemAddon {
     id: ID!
     menuAddon: MenuAddon!
@@ -201,6 +235,9 @@ export const typeDefs = `#graphql
     menus(pricingEnabled: Boolean): [Menu!]!
     combos(isEnable: Boolean): [Combo!]!
     belts(isEnable: Boolean): [Belt!]!
+    pages(isEnable: Boolean): [Page!]!
+    page(id: ID!): Page
+    pageBySlug(slug: String!): Page
     getCart(id: ID!): Cart
     orders(limit: Int): [Order!]!
     order(id: ID!): Order
@@ -297,6 +334,26 @@ export const typeDefs = `#graphql
     menuIds: [ID!]
   }
 
+  input PageBlockInput {
+    id: ID
+    type: PageBlockType!
+    sortOrder: Int
+    isEnable: Boolean
+    images: [String!]
+    imageLayout: ImageLayout
+    isBanner: Boolean
+    content: String
+    beltId: ID
+  }
+
+  input PageInput {
+    title: String!
+    slug: String
+    isEnable: Boolean
+    sortOrder: Int
+    blocks: [PageBlockInput!]
+  }
+
   type Mutation {
     createCart(input: CartInput!): Cart!
     updateCart(id: ID!, tableId: ID, note: String): Cart!
@@ -330,6 +387,9 @@ export const typeDefs = `#graphql
     storeBelt(input: BeltInput!): Belt!
     updateBelt(id: ID!, input: BeltInput!): Belt!
     deleteBelt(id: ID!): Boolean!
+    storePage(input: PageInput!): Page!
+    updatePage(id: ID!, input: PageInput!): Page!
+    deletePage(id: ID!): Boolean!
     adminForcePrice(menuId: ID!, action: String!): PriceState!
     updateSite(input: SiteInput!): Site!
     updateOrderStatus(id: ID!, status: String!): Order!

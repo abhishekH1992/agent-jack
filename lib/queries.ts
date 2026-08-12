@@ -91,6 +91,54 @@ export const DELETE_BELT = `
   }
 `;
 
+const PAGE_FIELDS = `
+  id title slug isEnable sortOrder
+  blocks {
+    id type sortOrder isEnable images imageLayout isBanner content beltId
+    belt {
+      id name sourceType categoryId subCategoryId isSlider isEnable sortOrder
+      category { id name slug }
+      subCategory { id name }
+      items { id sortOrder menu { id name } }
+      menus {
+        id name description image fixedPrice currentPrice lowestPrice highestPrice step pricingEnabled tags
+        variants { id name price }
+        addons { id name price }
+      }
+    }
+  }
+`;
+
+export const PAGES_QUERY = `
+  query Pages($isEnable: Boolean) {
+    pages(isEnable: $isEnable) { ${PAGE_FIELDS} }
+  }
+`;
+
+export const PAGE_BY_SLUG = `
+  query PageBySlug($slug: String!) {
+    pageBySlug(slug: $slug) { ${PAGE_FIELDS} }
+  }
+`;
+
+export const STORE_PAGE = `
+  mutation StorePage($input: PageInput!) {
+    storePage(input: $input) { ${PAGE_FIELDS} }
+  }
+`;
+
+export const UPDATE_PAGE = `
+  mutation UpdatePage($id: ID!, $input: PageInput!) {
+    updatePage(id: $id, input: $input) { ${PAGE_FIELDS} }
+  }
+`;
+
+export const DELETE_PAGE = `
+  mutation DeletePage($id: ID!) {
+    deletePage(id: $id)
+  }
+`;
+
 export const ADMIN_CATALOG_QUERY = `
   query AdminCatalog {
     categoryTypes { id name }
