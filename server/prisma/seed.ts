@@ -304,7 +304,6 @@ const menuTree: CatSeed[] = [
 
 async function main() {
   // Wipe
-  await prisma.chatMessage.deleteMany();
   await prisma.bidAttempt.deleteMany();
   await prisma.priceEvent.deleteMany();
   await prisma.orderItemAddon.deleteMany();

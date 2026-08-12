@@ -18,6 +18,13 @@ import {
 } from "@/components/admin/AdminListControls";
 import { TagInput } from "@/components/admin/TagInput";
 
+type OptionRow = {
+  key: string;
+  id?: string;
+  name: string;
+  price: string;
+};
+
 type Form = {
   name: string;
   description: string;
@@ -31,6 +38,8 @@ type Form = {
   isEnable: boolean;
   tags: string[];
   subCategoryId: string;
+  variants: OptionRow[];
+  addons: OptionRow[];
 };
 
 const empty = (): Form => ({
@@ -46,6 +55,8 @@ const empty = (): Form => ({
   isEnable: true,
   tags: [],
   subCategoryId: "",
+  variants: [],
+  addons: [],
 });
 
 function numOrNull(v: string) {
@@ -53,6 +64,108 @@ function numOrNull(v: string) {
   if (!t) return null;
   const n = Number(t);
   return Number.isFinite(n) ? n : null;
+}
+
+function newOptionRow(): OptionRow {
+  return {
+    key: `opt-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    name: "",
+    price: "0",
+  };
+}
+
+function rowsFromApi(list: any[] | undefined): OptionRow[] {
+  return (list || []).map((row, i) => ({
+    key: row.id || `row-${i}`,
+    id: row.id,
+    name: row.name || "",
+    price: row.price == null ? "0" : String(row.price),
+  }));
+}
+
+function optionsPayload(rows: OptionRow[]) {
+  return rows
+    .map((row) => ({
+      id: row.id,
+      name: row.name.trim(),
+      price: Number(row.price),
+    }))
+    .filter((row) => row.name && Number.isFinite(row.price));
+}
+
+function OptionListEditor({
+  title,
+  hint,
+  rows,
+  onChange,
+}: {
+  title: string;
+  hint: string;
+  rows: OptionRow[];
+  onChange: (rows: OptionRow[]) => void;
+}) {
+  return (
+    <div className="space-y-2 rounded-xl border border-[var(--line)] bg-[var(--page)] p-3">
+      <div className="flex items-center justify-between gap-2">
+        <div>
+          <div className="text-sm font-semibold">{title}</div>
+          <p className="text-xs text-[var(--muted)]">{hint}</p>
+        </div>
+        <button
+          type="button"
+          className="btn btn-secondary !min-h-8 !rounded-lg !px-2 !py-1 text-xs"
+          onClick={() => onChange([...rows, newOptionRow()])}
+        >
+          + Add
+        </button>
+      </div>
+      {rows.length === 0 ? (
+        <p className="text-xs text-[var(--muted)]">None yet.</p>
+      ) : (
+        <div className="space-y-2">
+          {rows.map((row) => (
+            <div
+              key={row.key}
+              className="grid grid-cols-[1fr_5.5rem_auto] gap-2"
+            >
+              <input
+                className="input !min-h-10"
+                placeholder="Name"
+                value={row.name}
+                onChange={(e) =>
+                  onChange(
+                    rows.map((r) =>
+                      r.key === row.key ? { ...r, name: e.target.value } : r,
+                    ),
+                  )
+                }
+              />
+              <input
+                className="input !min-h-10"
+                inputMode="decimal"
+                placeholder="Price"
+                value={row.price}
+                onChange={(e) =>
+                  onChange(
+                    rows.map((r) =>
+                      r.key === row.key ? { ...r, price: e.target.value } : r,
+                    ),
+                  )
+                }
+              />
+              <button
+                type="button"
+                className="btn btn-danger !min-h-10 !rounded-lg !px-3 text-xs"
+                onClick={() => onChange(rows.filter((r) => r.key !== row.key))}
+              >
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function AdminMenusPage() {
@@ -161,6 +274,8 @@ export default function AdminMenusPage() {
       isEnable: Boolean(menu.isEnable),
       tags: [...(menu.tags || [])],
       subCategoryId: menu.subCategoryId || "",
+      variants: rowsFromApi(menu.variants),
+      addons: rowsFromApi(menu.addons),
     });
   }
 
@@ -194,6 +309,8 @@ export default function AdminMenusPage() {
         isEnable: form.isEnable,
         tags: form.tags,
         subCategoryId: form.subCategoryId,
+        variants: optionsPayload(form.variants),
+        addons: optionsPayload(form.addons),
       };
       if (editingId) {
         const data = await adminGql<{ updateMenu: { description?: string | null } }>(
@@ -491,6 +608,20 @@ export default function AdminMenusPage() {
           <TagInput
             value={form.tags}
             onChange={(tags) => setForm((f) => ({ ...f, tags }))}
+          />
+
+          <OptionListEditor
+            title="Options"
+            hint="Sizes / choices shown as radio buttons (e.g. Small, Large)."
+            rows={form.variants}
+            onChange={(variants) => setForm((f) => ({ ...f, variants }))}
+          />
+
+          <OptionListEditor
+            title="Add-ons"
+            hint="Optional extras shown as checkboxes (e.g. Extra Cheese)."
+            rows={form.addons}
+            onChange={(addons) => setForm((f) => ({ ...f, addons }))}
           />
 
           {isLiquorCategory ? (

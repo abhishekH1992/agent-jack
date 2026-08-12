@@ -152,6 +152,8 @@ export const ADMIN_CATALOG_QUERY = `
         menus {
           id name description image fixedPrice currentPrice lowestPrice highestPrice
           step pricingEnabled isEnable tags subCategoryId
+          variants { id name price }
+          addons { id name price }
         }
       }
     }
@@ -205,6 +207,8 @@ export const STORE_MENU = `
     storeMenu(input: $input) {
       id name description image fixedPrice currentPrice lowestPrice highestPrice
       step pricingEnabled isEnable tags
+      variants { id name price }
+      addons { id name price }
     }
   }
 `;
@@ -214,6 +218,8 @@ export const UPDATE_MENU = `
     updateMenu(id: $id, input: $input) {
       id name description image fixedPrice currentPrice lowestPrice highestPrice
       step pricingEnabled isEnable tags
+      variants { id name price }
+      addons { id name price }
     }
   }
 `;
@@ -265,9 +271,23 @@ export const DELETE_CART_ITEM = `
 `;
 
 export const PLACE_BID = `
-  mutation PlaceBid($menuId: ID!, $amount: Float!, $cartId: ID!, $sessionId: String!) {
-    placeBid(menuId: $menuId, amount: $amount, cartId: $cartId, sessionId: $sessionId) {
-      success failCount message currentPrice
+  mutation PlaceBid(
+    $menuId: ID!
+    $amount: Float!
+    $cartId: ID!
+    $sessionId: String!
+    $chatAttempt: Int
+    $lastReply: String
+  ) {
+    placeBid(
+      menuId: $menuId
+      amount: $amount
+      cartId: $cartId
+      sessionId: $sessionId
+      chatAttempt: $chatAttempt
+      lastReply: $lastReply
+    ) {
+      success failCount offerLivePrice message currentPrice
       cartItem { id }
     }
   }

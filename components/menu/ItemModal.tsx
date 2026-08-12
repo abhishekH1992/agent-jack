@@ -114,23 +114,30 @@ export function ItemModal({
         <Modal.Container placement={placement} size="md" scroll="inside">
           <Modal.Dialog className="rounded-t-2xl bg-white sm:rounded-2xl">
             <Modal.Header className="border-b border-[var(--line)] pr-12">
-              <Modal.Heading className="font-display text-xl font-bold">
-                {menu.name}
-              </Modal.Heading>
+              <div className="flex items-center gap-3">
+                <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-xl bg-[var(--brand-soft)]">
+                  {menu.image ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={menu.image}
+                      alt=""
+                      className="absolute inset-0 h-full w-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-full items-center justify-center bg-[linear-gradient(135deg,#ffedd5,#fdba74)] px-1 text-center text-[10px] font-bold uppercase leading-tight text-[var(--brand)]">
+                      {menu.name.slice(0, 8)}
+                    </div>
+                  )}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <Modal.Heading className="truncate font-display text-xl font-bold">
+                    {menu.name}
+                  </Modal.Heading>
+                </div>
+              </div>
               <Modal.CloseTrigger className="absolute right-2 top-2 min-h-11 min-w-11" />
             </Modal.Header>
             <Modal.Body className="space-y-4 py-4">
-              {menu.image ? (
-                <div className="relative aspect-[16/10] overflow-hidden rounded-xl bg-[var(--brand-soft)]">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={menu.image}
-                    alt={menu.name}
-                    className="absolute inset-0 h-full w-full object-cover"
-                  />
-                </div>
-              ) : null}
-
               {menu.description ? (
                 <ExpandableDescription text={menu.description} lines={3} />
               ) : null}

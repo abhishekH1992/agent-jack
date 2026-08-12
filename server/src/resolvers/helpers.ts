@@ -46,6 +46,83 @@ export function menuWriteData(input: any) {
   };
 }
 
+function normalizeMenuOptions(rows: any[] | null | undefined) {
+  if (!Array.isArray(rows)) return [];
+  return rows
+    .map((row) => ({
+      id: row?.id ? String(row.id) : undefined,
+      name: String(row?.name || "").trim(),
+      price: Number(row?.price),
+    }))
+    .filter((row) => row.name && Number.isFinite(row.price));
+}
+
+/** Replace menu variants + addons from admin form payload. */
+export async function syncMenuOptions(
+  menuId: string,
+  input: { variants?: any[] | null; addons?: any[] | null },
+) {
+  const variants = normalizeMenuOptions(input.variants);
+  const addons = normalizeMenuOptions(input.addons);
+
+  const existingAddonIds = (
+    await prisma.menuAddon.findMany({
+      where: { menuId },
+      select: { id: true },
+    })
+  ).map((a) => a.id);
+  if (existingAddonIds.length) {
+    await prisma.cartItemAddon.deleteMany({
+      where: { menuAddonId: { in: existingAddonIds } },
+    });
+    await prisma.orderItemAddon.deleteMany({
+      where: { menuAddonId: { in: existingAddonIds } },
+    });
+    await prisma.menuAddon.deleteMany({ where: { menuId } });
+  }
+
+  const existingVariantIds = (
+    await prisma.menuVariant.findMany({
+      where: { menuId },
+      select: { id: true },
+    })
+  ).map((v) => v.id);
+  if (existingVariantIds.length) {
+    await prisma.cartItem.updateMany({
+      where: { menuVariantId: { in: existingVariantIds } },
+      data: { menuVariantId: null },
+    });
+    await prisma.orderItem.updateMany({
+      where: { menuVariantId: { in: existingVariantIds } },
+      data: { menuVariantId: null },
+    });
+    await prisma.comboItem.updateMany({
+      where: { menuVariantId: { in: existingVariantIds } },
+      data: { menuVariantId: null },
+    });
+    await prisma.menuVariant.deleteMany({ where: { menuId } });
+  }
+
+  if (variants.length) {
+    await prisma.menuVariant.createMany({
+      data: variants.map((v) => ({
+        menuId,
+        name: v.name,
+        price: v.price,
+      })),
+    });
+  }
+  if (addons.length) {
+    await prisma.menuAddon.createMany({
+      data: addons.map((a) => ({
+        menuId,
+        name: a.name,
+        price: a.price,
+      })),
+    });
+  }
+}
+
 export const menuInclude = {
   addons: true,
   variants: true,

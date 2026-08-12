@@ -213,6 +213,8 @@ export const typeDefs = `#graphql
   type BidResult {
     success: Boolean!
     failCount: Int!
+    # True after 3 failed bids — client shows live-price Accept offer instead of chat
+    offerLivePrice: Boolean!
     message: String!
     currentPrice: Float!
     cartItem: CartItem
@@ -284,6 +286,12 @@ export const typeDefs = `#graphql
     categoryId: ID!
   }
 
+  input MenuOptionInput {
+    id: ID
+    name: String!
+    price: Float!
+  }
+
   input MenuInput {
     name: String!
     description: String
@@ -297,6 +305,10 @@ export const typeDefs = `#graphql
     isEnable: Boolean
     tags: [String!]
     subCategoryId: ID!
+    # Size / option variants (e.g. Small, Large)
+    variants: [MenuOptionInput!]
+    # Add-ons (e.g. Extra Cheese)
+    addons: [MenuOptionInput!]
   }
 
   input TableInput {
@@ -374,7 +386,16 @@ export const typeDefs = `#graphql
     updateCart(id: ID!, tableId: ID, note: String): Cart!
     addCartItem(input: CartItemInput!): CartItem!
     deleteCartItem(id: ID!): Boolean!
-    placeBid(menuId: ID!, amount: Float!, cartId: ID!, sessionId: String!): BidResult!
+    placeBid(
+      menuId: ID!
+      amount: Float!
+      cartId: ID!
+      sessionId: String!
+      # 1-based fail attempt in this modal (for chat tone); omit on success / accept-offer
+      chatAttempt: Int
+      # Last assistant line — model must not repeat it
+      lastReply: String
+    ): BidResult!
     createCheckoutSession(
       cartId: ID!
       tableId: ID

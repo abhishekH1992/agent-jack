@@ -1,4 +1,3 @@
-import { ChatRole } from "@prisma/client";
 import { GraphQLScalarType, Kind } from "graphql";
 import { prisma } from "../prisma.js";
 import { GraphQLContext, requireAdmin } from "../context.js";
@@ -18,6 +17,7 @@ import {
   persistBelt,
   persistPage,
   resolveBeltMenus,
+  syncMenuOptions,
 } from "./helpers.js";
 
 const DateTime = new GraphQLScalarType({
@@ -319,7 +319,16 @@ export const resolvers = {
         amount,
         cartId,
         sessionId,
-      }: { menuId: string; amount: number; cartId: string; sessionId: string },
+        chatAttempt,
+        lastReply,
+      }: {
+        menuId: string;
+        amount: number;
+        cartId: string;
+        sessionId: string;
+        chatAttempt?: number | null;
+        lastReply?: string | null;
+      },
       ctx: GraphQLContext,
     ) => {
       const rounded = Math.round(Number(amount) * 100) / 100;
@@ -359,16 +368,8 @@ export const resolvers = {
       });
 
       const failCount = success ? 0 : recentFails + 1;
-
-      await prisma.chatMessage.create({
-        data: {
-          menuId,
-          sessionId,
-          userId: ctx.user?.id,
-          role: ChatRole.USER,
-          content: rounded.toFixed(2),
-        },
-      });
+      // Client owns the 3-miss offer UI; this flag is informational only
+      const offerLivePrice = !success && Number(chatAttempt || 0) >= 3;
 
       let cartItem = null;
       if (success) {
@@ -389,32 +390,23 @@ export const resolvers = {
         await bumpPriceOnBid(menuId);
       }
 
-      const refreshed = await prisma.menu.findUniqueOrThrow({ where: { id: menuId } });
+      const refreshed = await prisma.menu.findUniqueOrThrow({
+        where: { id: menuId },
+      });
       const currentPrice = Number(refreshed.currentPrice ?? refreshed.fixedPrice);
 
       const message = await generateBidChatReply({
         menuName: menu.name,
-        currentPrice: success ? current : currentPrice,
-        lowestPrice: Number(menu.lowestPrice ?? menu.fixedPrice),
-        highestPrice: max,
         bidAmount: rounded,
         success,
-        failCount,
-      });
-
-      await prisma.chatMessage.create({
-        data: {
-          menuId,
-          sessionId,
-          userId: ctx.user?.id,
-          role: ChatRole.ASSISTANT,
-          content: message,
-        },
+        chatAttempt: Number(chatAttempt || failCount || 1),
+        lastReply: lastReply || null,
       });
 
       return {
         success,
         failCount,
+        offerLivePrice,
         message,
         currentPrice,
         cartItem: cartItem
@@ -602,7 +594,14 @@ export const resolvers = {
         data: menuWriteData(input),
         include: menuInclude,
       });
-      return mapMenu(menu);
+      if (input.variants != null || input.addons != null) {
+        await syncMenuOptions(menu.id, input);
+      }
+      const full = await prisma.menu.findUniqueOrThrow({
+        where: { id: menu.id },
+        include: menuInclude,
+      });
+      return mapMenu(full);
     },
     updateMenu: async (
       _: unknown,
@@ -610,9 +609,15 @@ export const resolvers = {
       ctx: GraphQLContext,
     ) => {
       requireAdmin(ctx);
-      const menu = await prisma.menu.update({
+      await prisma.menu.update({
         where: { id },
         data: menuWriteData(input),
+      });
+      if (input.variants != null || input.addons != null) {
+        await syncMenuOptions(id, input);
+      }
+      const menu = await prisma.menu.findUniqueOrThrow({
+        where: { id },
         include: menuInclude,
       });
       return mapMenu(menu);
