@@ -541,6 +541,11 @@ async function main() {
             images: banners,
             imageLayout: "SLIDER",
             isBanner: true,
+            content: JSON.stringify({
+              header: "Bid · Order · Feast",
+              subheader:
+                "Live liquor prices and table ordering — right from your seat.",
+            }),
             buttons: [
               {
                 label: "Pancake",

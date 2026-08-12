@@ -3,6 +3,7 @@
 import { useState } from "react";
 import clsx from "clsx";
 import { HomeBanner } from "@/components/layout/HomeBanner";
+import { parseBannerCopy } from "@/lib/banner-copy";
 import { BeltSection } from "@/components/menu/BeltSection";
 import { MenuBrowseBlock } from "@/components/menu/MenuBrowseBlock";
 import { ItemModal, ModalMenu } from "@/components/menu/ItemModal";
@@ -101,6 +102,8 @@ export function PageRenderer({
                 banners={block.images || []}
                 siteName={siteName}
                 buttons={block.buttons || []}
+                header={parseBannerCopy(block.content).header}
+                subheader={parseBannerCopy(block.content).subheader}
               />
             </div>
           );

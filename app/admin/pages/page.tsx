@@ -39,6 +39,10 @@ import {
   serializeMenuBrowseConfig,
   type MenuBrowseConfig,
 } from "@/lib/menu-browse";
+import {
+  parseBannerCopy,
+  serializeBannerCopy,
+} from "@/lib/banner-copy";
 
 type BlockType = "IMAGE" | "RICH_TEXT" | "BELT" | "MENU_BROWSE";
 type ImageLayout = "SINGLE" | "COLUMN" | "SLIDER";
@@ -391,7 +395,9 @@ export default function AdminPagesPage() {
           content:
             b.type === "RICH_TEXT" || b.type === "MENU_BROWSE"
               ? b.content
-              : null,
+              : b.type === "IMAGE" && b.isBanner
+                ? serializeBannerCopy(parseBannerCopy(b.content))
+                : null,
           beltId: b.type === "BELT" ? beltId : null,
         });
       }
@@ -651,14 +657,63 @@ export default function AdminPagesPage() {
                         <input
                           type="checkbox"
                           checked={block.isBanner}
-                          onChange={(e) =>
+                          onChange={(e) => {
+                            const isBanner = e.target.checked;
                             updateBlock(block.id, {
-                              isBanner: e.target.checked,
-                            })
-                          }
+                              isBanner,
+                              imageLayout: isBanner
+                                ? "SLIDER"
+                                : block.imageLayout,
+                              content: isBanner
+                                ? serializeBannerCopy(
+                                    parseBannerCopy(block.content),
+                                  )
+                                : block.content,
+                            });
+                          }}
                         />
                         Is banner (full-bleed hero slider)
                       </label>
+                      {block.isBanner ? (
+                        <div className="grid gap-2 sm:grid-cols-2">
+                          <label className="block space-y-1 text-sm sm:col-span-2">
+                            <span className="text-[var(--muted)]">
+                              Header (optional)
+                            </span>
+                            <input
+                              className="input"
+                              placeholder="e.g. Bid · Order · Feast"
+                              value={parseBannerCopy(block.content).header}
+                              onChange={(e) =>
+                                updateBlock(block.id, {
+                                  content: serializeBannerCopy({
+                                    ...parseBannerCopy(block.content),
+                                    header: e.target.value,
+                                  }),
+                                })
+                              }
+                            />
+                          </label>
+                          <label className="block space-y-1 text-sm sm:col-span-2">
+                            <span className="text-[var(--muted)]">
+                              Subheader (optional)
+                            </span>
+                            <input
+                              className="input"
+                              placeholder="e.g. Live liquor prices from your table"
+                              value={parseBannerCopy(block.content).subheader}
+                              onChange={(e) =>
+                                updateBlock(block.id, {
+                                  content: serializeBannerCopy({
+                                    ...parseBannerCopy(block.content),
+                                    subheader: e.target.value,
+                                  }),
+                                })
+                              }
+                            />
+                          </label>
+                        </div>
+                      ) : null}
                       <ImageUploadField
                         value=""
                         folder="banners"
