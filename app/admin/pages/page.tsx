@@ -28,6 +28,12 @@ import {
   emptyBeltSource,
   type BeltSourceValue,
 } from "@/components/admin/BeltSourceFields";
+import {
+  menuCategoryHref,
+  menuSubcategoryHref,
+  parseMenuButtonHref,
+  type MenuLinkType,
+} from "@/lib/menu-links";
 
 type BlockType = "IMAGE" | "RICH_TEXT" | "BELT";
 type ImageLayout = "SINGLE" | "COLUMN" | "SLIDER";
@@ -37,6 +43,9 @@ type BannerButtonForm = {
   label: string;
   href: string;
   variant: "primary" | "secondary";
+  linkType: MenuLinkType;
+  categoryId: string;
+  subCategoryId: string;
 };
 
 type BlockForm = {
@@ -143,12 +152,23 @@ export default function AdminPagesPage() {
         images: b.images || [],
         imageLayout: (b.imageLayout || "SINGLE") as ImageLayout,
         isBanner: Boolean(b.isBanner),
-        buttons: (b.buttons || []).map((btn: any, bi: number) => ({
-          id: `btn-${b.id || i}-${bi}`,
-          label: btn.label || "",
-          href: btn.href || "",
-          variant: btn.variant === "secondary" ? "secondary" : "primary",
-        })),
+        buttons: (b.buttons || []).map((btn: any, bi: number) => {
+          const parsed = parseMenuButtonHref(btn.href || "");
+          const cat =
+            categories.find(
+              (c) =>
+                c.slug === parsed.categorySlug || c.id === parsed.categorySlug,
+            ) || null;
+          return {
+            id: `btn-${b.id || i}-${bi}`,
+            label: btn.label || "",
+            href: btn.href || "",
+            variant: btn.variant === "secondary" ? "secondary" : "primary",
+            linkType: parsed.linkType,
+            categoryId: cat?.id || "",
+            subCategoryId: parsed.subId || "",
+          };
+        }),
         content: b.content || "",
         beltId: b.beltId || b.belt?.id || "",
         belt: b.belt
@@ -162,6 +182,73 @@ export default function AdminPagesPage() {
     setForm((prev) => ({
       ...prev,
       blocks: prev.blocks.map((b) => (b.id === id ? { ...b, ...patch } : b)),
+    }));
+  }
+
+  const allSubCategories = useMemo(
+    () =>
+      categories.flatMap((c) =>
+        (c.subCategories || []).map((s: any) => ({
+          ...s,
+          categoryId: c.id,
+          categorySlug: c.slug,
+          categoryName: c.name,
+        })),
+      ),
+    [categories],
+  );
+
+  function buildButtonHref(btn: BannerButtonForm): string {
+    if (btn.linkType === "category") {
+      const cat = categories.find((c) => c.id === btn.categoryId);
+      return cat ? menuCategoryHref(cat.slug) : "/menu";
+    }
+    if (btn.linkType === "subcategory") {
+      const sub = allSubCategories.find((s) => s.id === btn.subCategoryId);
+      if (!sub) return "/menu";
+      return menuSubcategoryHref(sub.categorySlug, sub.id);
+    }
+    return btn.href;
+  }
+
+  function updateButton(
+    blockId: string,
+    buttonId: string,
+    patch: Partial<BannerButtonForm>,
+  ) {
+    setForm((prev) => ({
+      ...prev,
+      blocks: prev.blocks.map((block) => {
+        if (block.id !== blockId) return block;
+        return {
+          ...block,
+          buttons: block.buttons.map((btn) => {
+            if (btn.id !== buttonId) return btn;
+            const next = { ...btn, ...patch };
+            // Keep label in sync when picking category/sub unless admin typed custom
+            if (patch.categoryId && next.linkType === "category") {
+              const cat = categories.find((c) => c.id === patch.categoryId);
+              if (cat && (!btn.label || btn.label === categories.find((c) => c.id === btn.categoryId)?.name)) {
+                next.label = cat.name;
+              }
+            }
+            if (patch.subCategoryId && next.linkType === "subcategory") {
+              const sub = allSubCategories.find(
+                (s) => s.id === patch.subCategoryId,
+              );
+              const prevSub = allSubCategories.find(
+                (s) => s.id === btn.subCategoryId,
+              );
+              if (sub && (!btn.label || btn.label === prevSub?.name)) {
+                next.label = sub.name;
+              }
+              if (sub) next.categoryId = sub.categoryId;
+            }
+            next.href = buildButtonHref(next);
+            return next;
+          }),
+        };
+      }),
     }));
   }
 
@@ -561,6 +648,9 @@ export default function AdminPagesPage() {
                                     label: "",
                                     href: "",
                                     variant: "primary",
+                                    linkType: "subcategory",
+                                    categoryId: "",
+                                    subCategoryId: "",
                                   },
                                 ],
                               })
@@ -571,77 +661,123 @@ export default function AdminPagesPage() {
                         </div>
                         {block.buttons.length === 0 ? (
                           <p className="text-xs text-[var(--muted)]">
-                            Optional CTAs on the banner (theme primary /
-                            secondary).
+                            Link to a category or subcategory on /menu, or a
+                            custom URL.
                           </p>
                         ) : null}
                         {block.buttons.map((btn) => (
                           <div
                             key={btn.id}
-                            className="grid gap-2 rounded-lg border border-[var(--line)] p-2 sm:grid-cols-[1fr_1fr_auto_auto]"
+                            className="space-y-2 rounded-lg border border-[var(--line)] p-2"
                           >
-                            <input
-                              className="input !min-h-10"
-                              placeholder="Label"
-                              value={btn.label}
-                              onChange={(e) =>
-                                updateBlock(block.id, {
-                                  buttons: block.buttons.map((x) =>
-                                    x.id === btn.id
-                                      ? { ...x, label: e.target.value }
-                                      : x,
-                                  ),
-                                })
-                              }
-                            />
-                            <input
-                              className="input !min-h-10"
-                              placeholder="/menu or https://…"
-                              value={btn.href}
-                              onChange={(e) =>
-                                updateBlock(block.id, {
-                                  buttons: block.buttons.map((x) =>
-                                    x.id === btn.id
-                                      ? { ...x, href: e.target.value }
-                                      : x,
-                                  ),
-                                })
-                              }
-                            />
+                            <div className="grid gap-2 sm:grid-cols-[1fr_auto_auto]">
+                              <input
+                                className="input !min-h-10"
+                                placeholder="Label"
+                                value={btn.label}
+                                onChange={(e) =>
+                                  updateButton(block.id, btn.id, {
+                                    label: e.target.value,
+                                  })
+                                }
+                              />
+                              <select
+                                className="input !min-h-10"
+                                value={btn.variant}
+                                onChange={(e) =>
+                                  updateButton(block.id, btn.id, {
+                                    variant: e.target.value as
+                                      | "primary"
+                                      | "secondary",
+                                  })
+                                }
+                              >
+                                <option value="primary">Primary</option>
+                                <option value="secondary">Secondary</option>
+                              </select>
+                              <button
+                                type="button"
+                                className="btn btn-danger !min-h-10 !rounded-lg !px-3 text-xs"
+                                onClick={() =>
+                                  updateBlock(block.id, {
+                                    buttons: block.buttons.filter(
+                                      (x) => x.id !== btn.id,
+                                    ),
+                                  })
+                                }
+                              >
+                                ×
+                              </button>
+                            </div>
                             <select
                               className="input !min-h-10"
-                              value={btn.variant}
+                              value={btn.linkType}
                               onChange={(e) =>
-                                updateBlock(block.id, {
-                                  buttons: block.buttons.map((x) =>
-                                    x.id === btn.id
-                                      ? {
-                                          ...x,
-                                          variant: e.target.value as
-                                            | "primary"
-                                            | "secondary",
-                                        }
-                                      : x,
-                                  ),
+                                updateButton(block.id, btn.id, {
+                                  linkType: e.target.value as MenuLinkType,
+                                  href:
+                                    e.target.value === "custom" ? btn.href : "",
                                 })
                               }
                             >
-                              <option value="primary">Primary</option>
-                              <option value="secondary">Secondary</option>
+                              <option value="subcategory">
+                                Menu subcategory
+                              </option>
+                              <option value="category">Menu category</option>
+                              <option value="custom">Custom URL</option>
                             </select>
-                            <button
-                              type="button"
-                              className="btn btn-danger !min-h-10 !rounded-lg !px-3 text-xs"
-                              onClick={() =>
-                                updateBlock(block.id, {
-                                  buttons: block.buttons.filter(
-                                    (x) => x.id !== btn.id,
-                                  ),
-                                })
-                              }
-                            >
-                              ×
-                            </button>
+                            {btn.linkType === "category" ? (
+                              <select
+                                className="input !min-h-10"
+                                value={btn.categoryId}
+                                onChange={(e) =>
+                                  updateButton(block.id, btn.id, {
+                                    categoryId: e.target.value,
+                                  })
+                                }
+                              >
+                                <option value="">Select category…</option>
+                                {categories.map((c) => (
+                                  <option key={c.id} value={c.id}>
+                                    {c.name}
+                                  </option>
+                                ))}
+                              </select>
+                            ) : null}
+                            {btn.linkType === "subcategory" ? (
+                              <select
+                                className="input !min-h-10"
+                                value={btn.subCategoryId}
+                                onChange={(e) =>
+                                  updateButton(block.id, btn.id, {
+                                    subCategoryId: e.target.value,
+                                  })
+                                }
+                              >
+                                <option value="">Select subcategory…</option>
+                                {allSubCategories.map((s) => (
+                                  <option key={s.id} value={s.id}>
+                                    {s.categoryName} · {s.name}
+                                  </option>
+                                ))}
+                              </select>
+                            ) : null}
+                            {btn.linkType === "custom" ? (
+                              <input
+                                className="input !min-h-10"
+                                placeholder="/menu or https://…"
+                                value={btn.href}
+                                onChange={(e) =>
+                                  updateButton(block.id, btn.id, {
+                                    href: e.target.value,
+                                  })
+                                }
+                              />
+                            ) : (
+                              <p className="text-xs text-[var(--muted)]">
+                                Opens: {btn.href || "—"}
+                              </p>
+                            )}
                           </div>
                         ))}
                       </div>

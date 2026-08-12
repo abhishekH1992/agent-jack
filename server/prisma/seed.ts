@@ -364,22 +364,28 @@ async function main() {
   console.log(`DB admin user: ${ADMIN_EMAIL} (role=admin)`);
 
   let basicsCategoryId = "";
+  let basicsCategorySlug = "";
   let burgerSubCategoryId = "";
+  let pancakeSubCategoryId = "";
   let liquorCategoryId = "";
   const burgerMenuIds: string[] = [];
   const pizzaMenuIds: string[] = [];
 
   for (const block of menuTree) {
+    const categorySlug = slugify(block.category);
     const category = await prisma.category.create({
       data: {
         name: block.category,
-        slug: slugify(block.category),
+        slug: categorySlug,
         image: useTmpImage("category", block.category),
         isEnable: true,
         categoryTypeId: block.type === "Liquor" ? liquorType.id : foodType.id,
       },
     });
-    if (block.category === "THE BASICS") basicsCategoryId = category.id;
+    if (block.category === "THE BASICS") {
+      basicsCategoryId = category.id;
+      basicsCategorySlug = categorySlug;
+    }
     if (block.category === "LIQUOR") liquorCategoryId = category.id;
 
     for (const sub of block.sub) {
@@ -392,6 +398,7 @@ async function main() {
         },
       });
       if (sub.name === "BURGER") burgerSubCategoryId = subCategory.id;
+      if (sub.name === "PANCAKE") pancakeSubCategoryId = subCategory.id;
 
       for (const menuName of sub.menu) {
         const base = sub.liquor ? randPrice(6, 11) : randPrice(10, 22);
@@ -534,7 +541,14 @@ async function main() {
             imageLayout: "SLIDER",
             isBanner: true,
             buttons: [
-              { label: "Browse menu", href: "/menu", variant: "primary" },
+              {
+                label: "Pancake",
+                href:
+                  pancakeSubCategoryId && basicsCategorySlug
+                    ? `/menu?category=${encodeURIComponent(basicsCategorySlug)}&sub=${encodeURIComponent(pancakeSubCategoryId)}`
+                    : "/menu",
+                variant: "primary",
+              },
               { label: "View cart", href: "/cart", variant: "secondary" },
             ],
           },

@@ -41,17 +41,18 @@ export function MenuCard({
               className="absolute inset-0 h-full w-full object-cover"
             />
           ) : null}
-          <div className="absolute bottom-3 left-3">
-            <span
-              className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${
-                menu.pricingEnabled
-                  ? "bg-white/95 text-[var(--brand)]"
-                  : "bg-[var(--cta)] text-white"
-              }`}
-            >
-              {menu.pricingEnabled ? "Live bid" : "Kitchen"}
-            </span>
-          </div>
+          {menu.tags && menu.tags.length > 0 ? (
+            <div className="absolute bottom-3 left-3 flex max-w-[90%] flex-wrap gap-1.5">
+              {menu.tags.map((tag) => (
+                <span
+                  key={tag}
+                  className="rounded-full bg-white/95 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-[var(--brand)]"
+                >
+                  {tag}
+                </span>
+              ))}
+            </div>
+          ) : null}
         </div>
         <Card.Content className="space-y-2 p-4 pb-2">
           <div className="flex items-start justify-between gap-3">

@@ -73,17 +73,32 @@ export const resolvers = {
           },
         },
       }),
-    categories: (_: unknown, { isEnable }: { isEnable?: boolean }) =>
-      prisma.category.findMany({
+    categories: async (_: unknown, { isEnable }: { isEnable?: boolean }) => {
+      const cats = await prisma.category.findMany({
         where: isEnable == null ? undefined : { isEnable },
         include: {
           categoryType: true,
           subCategories: {
-            include: { menus: { include: menuInclude } },
+            where: isEnable == null ? undefined : { isEnable: true },
+            include: {
+              menus: {
+                where: isEnable == null ? undefined : { isEnable: true },
+                include: menuInclude,
+              },
+            },
+            orderBy: { name: "asc" },
           },
         },
         orderBy: { name: "asc" },
-      }),
+      });
+      return cats.map((cat) => ({
+        ...cat,
+        subCategories: cat.subCategories.map((s) => ({
+          ...s,
+          menus: s.menus.map(mapMenu),
+        })),
+      }));
+    },
     categoryBySlug: async (_: unknown, { slug }: { slug: string }) => {
       const cat = await prisma.category.findUnique({
         where: { slug },

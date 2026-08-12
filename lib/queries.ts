@@ -10,9 +10,9 @@ export const CATEGORIES_QUERY = `
       id name slug image
       categoryType { id name }
       subCategories {
-        id name
+        id name image isEnable
         menus {
-          id name description image fixedPrice currentPrice lowestPrice highestPrice step pricingEnabled tags
+          id name description image fixedPrice currentPrice lowestPrice highestPrice step pricingEnabled tags isEnable
           variants { id name price }
           addons { id name price }
         }
