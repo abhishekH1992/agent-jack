@@ -587,6 +587,52 @@ async function main() {
 
   await prisma.page.create({
     data: {
+      title: "Menu",
+      slug: "menu",
+      isEnable: true,
+      sortOrder: 1,
+      blocks: {
+        create: [
+          {
+            type: "MENU_BROWSE",
+            sortOrder: 0,
+            isEnable: true,
+            content: JSON.stringify({
+              catalog: "food",
+              showCategory: true,
+              showSubcategory: true,
+            }),
+          },
+        ],
+      },
+    },
+  });
+
+  await prisma.page.create({
+    data: {
+      title: "Liquor",
+      slug: "liquor",
+      isEnable: true,
+      sortOrder: 2,
+      blocks: {
+        create: [
+          {
+            type: "MENU_BROWSE",
+            sortOrder: 0,
+            isEnable: true,
+            content: JSON.stringify({
+              catalog: "liquor",
+              showCategory: true,
+              showSubcategory: true,
+            }),
+          },
+        ],
+      },
+    },
+  });
+
+  await prisma.page.create({
+    data: {
       title: "Privacy Policy",
       slug: "privacy-policy",
       isEnable: true,

@@ -1,29 +1,15 @@
-import { Suspense } from "react";
-import { gql } from "@/lib/graphql";
-import { CATEGORIES_QUERY } from "@/lib/queries";
-import { MenuBrowseClient } from "@/components/menu/MenuBrowseClient";
+import { PageRenderer } from "@/components/page/PageRenderer";
+import { loadPageBySlug } from "@/lib/load-page";
 
 export default async function MenuPage() {
-  let categories: any[] = [];
-  try {
-    const data = await gql<{ categories: any[] }>(CATEGORIES_QUERY);
-    // Food menu page — exclude Liquor (has its own nav entry)
-    categories = (data.categories || []).filter(
-      (c) => (c.categoryType?.name || "").toLowerCase() !== "liquor",
+  const { page, siteName } = await loadPageBySlug("menu");
+  if (!page) {
+    return (
+      <div className="page-shell py-10 text-sm text-[var(--muted)]">
+        Menu page is not configured yet. Create a page with slug{" "}
+        <code>menu</code> in Admin → Pages.
+      </div>
     );
-  } catch {
-    categories = [];
   }
-
-  return (
-    <Suspense
-      fallback={
-        <div className="page-shell py-8 text-sm text-[var(--muted)]">
-          Loading menu…
-        </div>
-      }
-    >
-      <MenuBrowseClient categories={categories} />
-    </Suspense>
-  );
+  return <PageRenderer page={page} siteName={siteName} />;
 }

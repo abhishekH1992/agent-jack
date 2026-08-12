@@ -121,6 +121,8 @@ enum PageBlockType {
   IMAGE
   RICH_TEXT
   BELT
+  /// Category → subcategory → menu browse (food / liquor / all via content)
+  MENU_BROWSE
 }
 
 enum ImageLayout {
@@ -154,7 +156,7 @@ model PageBlock {
   isBanner    Boolean        @default(false)
   /// Banner / image CTAs: [{ label, href, variant: primary|secondary }]
   buttons     Json           @default("[]")
-  /// RICH_TEXT block (HTML)
+  /// RICH_TEXT: HTML. MENU_BROWSE: catalog filter food|liquor|all
   content     String?        @db.Text
   /// BELT block
   beltId      String?

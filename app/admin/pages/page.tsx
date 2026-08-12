@@ -34,8 +34,13 @@ import {
   parseMenuButtonHref,
   type MenuLinkType,
 } from "@/lib/menu-links";
+import {
+  parseMenuBrowseConfig,
+  serializeMenuBrowseConfig,
+  type MenuBrowseConfig,
+} from "@/lib/menu-browse";
 
-type BlockType = "IMAGE" | "RICH_TEXT" | "BELT";
+type BlockType = "IMAGE" | "RICH_TEXT" | "BELT" | "MENU_BROWSE";
 type ImageLayout = "SINGLE" | "COLUMN" | "SLIDER";
 
 type BannerButtonForm = {
@@ -81,7 +86,14 @@ const emptyBlock = (
   imageLayout: "SINGLE",
   isBanner: false,
   buttons: [],
-  content: "",
+  content:
+    type === "MENU_BROWSE"
+      ? serializeMenuBrowseConfig({
+          catalog: "food",
+          showCategory: true,
+          showSubcategory: true,
+        })
+      : "",
   beltId: "",
   belt: emptyBeltSource(categories),
 });
@@ -99,6 +111,62 @@ function slugify(s: string) {
     .trim()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/(^-|-$)/g, "");
+}
+
+function MenuBrowseBlockFields({
+  value,
+  onChange,
+}: {
+  value: MenuBrowseConfig;
+  onChange: (next: MenuBrowseConfig) => void;
+}) {
+  return (
+    <div className="space-y-3">
+      <label className="block space-y-1 text-sm">
+        <span className="text-[var(--muted)]">Catalog</span>
+        <select
+          className="input"
+          value={value.catalog}
+          onChange={(e) =>
+            onChange({
+              ...value,
+              catalog: e.target.value as MenuBrowseConfig["catalog"],
+            })
+          }
+        >
+          <option value="food">Food only</option>
+          <option value="liquor">Liquor only</option>
+          <option value="all">All categories</option>
+        </select>
+      </label>
+      <div className="flex flex-wrap gap-4 text-sm">
+        <label className="inline-flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={value.showCategory}
+            onChange={(e) =>
+              onChange({ ...value, showCategory: e.target.checked })
+            }
+          />
+          Show category
+        </label>
+        <label className="inline-flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={value.showSubcategory}
+            onChange={(e) =>
+              onChange({ ...value, showSubcategory: e.target.checked })
+            }
+          />
+          Show subcategory
+        </label>
+      </div>
+      <p className="text-xs text-[var(--muted)]">
+        Only checked rows appear. Menus always show for the current
+        selection (or all items if both are off).
+      </p>
+    </div>
+  );
 }
 
 export default function AdminPagesPage() {
@@ -169,7 +237,10 @@ export default function AdminPagesPage() {
             subCategoryId: parsed.subId || "",
           };
         }),
-        content: b.content || "",
+        content:
+          b.type === "MENU_BROWSE"
+            ? serializeMenuBrowseConfig(parseMenuBrowseConfig(b.content))
+            : b.content || "",
         beltId: b.beltId || b.belt?.id || "",
         belt: b.belt
           ? beltSourceFromBelt(b.belt)
@@ -317,7 +388,10 @@ export default function AdminPagesPage() {
                     variant: btn.variant,
                   }))
               : [],
-          content: b.type === "RICH_TEXT" ? b.content : null,
+          content:
+            b.type === "RICH_TEXT" || b.type === "MENU_BROWSE"
+              ? b.content
+              : null,
           beltId: b.type === "BELT" ? beltId : null,
         });
       }
@@ -487,6 +561,7 @@ export default function AdminPagesPage() {
                     ["IMAGE", "Image"],
                     ["RICH_TEXT", "Rich text"],
                     ["BELT", "Belt"],
+                    ["MENU_BROWSE", "Menu browse"],
                   ] as const
                 ).map(([type, label]) => (
                   <button
@@ -796,6 +871,17 @@ export default function AdminPagesPage() {
                         placeholder="<p>Your content…</p>"
                       />
                     </label>
+                  ) : null}
+
+                  {block.type === "MENU_BROWSE" ? (
+                    <MenuBrowseBlockFields
+                      value={parseMenuBrowseConfig(block.content)}
+                      onChange={(next) =>
+                        updateBlock(block.id, {
+                          content: serializeMenuBrowseConfig(next),
+                        })
+                      }
+                    />
                   ) : null}
 
                   {block.type === "BELT" ? (

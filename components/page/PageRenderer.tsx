@@ -4,13 +4,14 @@ import { useState } from "react";
 import clsx from "clsx";
 import { HomeBanner } from "@/components/layout/HomeBanner";
 import { BeltSection } from "@/components/menu/BeltSection";
+import { MenuBrowseBlock } from "@/components/menu/MenuBrowseBlock";
 import { ItemModal, ModalMenu } from "@/components/menu/ItemModal";
 import { BidChatModal } from "@/components/bid/BidChatModal";
 import { ImageBlock } from "@/components/page/ImageBlock";
 
 export type PageBlockData = {
   id: string;
-  type: "IMAGE" | "RICH_TEXT" | "BELT";
+  type: "IMAGE" | "RICH_TEXT" | "BELT" | "MENU_BROWSE";
   sortOrder: number;
   isEnable: boolean;
   images: string[];
@@ -65,7 +66,11 @@ export function PageRenderer({
     else setFoodMenu(normalized);
   }
 
-  const showPageTitle = showTitle && page.slug !== "home";
+  const showPageTitle =
+    showTitle &&
+    page.slug !== "home" &&
+    page.slug !== "menu" &&
+    page.slug !== "liquor";
 
   return (
     <div className="pb-32">
@@ -96,6 +101,17 @@ export function PageRenderer({
                 siteName={siteName}
                 buttons={block.buttons || []}
               />
+            </div>
+          );
+        }
+
+        if (block.type === "MENU_BROWSE") {
+          return (
+            <div
+              key={block.id}
+              className={clsx(!first && "mt-6 sm:mt-8")}
+            >
+              <MenuBrowseBlock content={block.content} />
             </div>
           );
         }

@@ -119,6 +119,7 @@ export const typeDefs = `#graphql
     IMAGE
     RICH_TEXT
     BELT
+    MENU_BROWSE
   }
 
   enum ImageLayout {
