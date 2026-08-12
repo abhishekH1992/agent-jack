@@ -342,6 +342,10 @@ summary {
   .admin-shell {
     grid-template-columns: 260px 1fr;
   }
+
+  .admin-shell.settings-nav {
+    grid-template-columns: 260px 220px 1fr;
+  }
 }
 
 /* Sticky bottom bars — respect iOS home indicator */

@@ -43,10 +43,11 @@ export default function AdminSettingsPage() {
           className="text-3xl md:text-4xl"
           style={{ fontFamily: "var(--font-display), serif" }}
         >
-          Settings
+          Site Settings
         </h1>
         <p className="text-sm text-[var(--muted)]">
-          Restaurant profile. Stripe secrets stay in environment variables.
+          Restaurant name, contact, and logo. Stripe secrets stay in environment
+          variables.
         </p>
       </div>
 
