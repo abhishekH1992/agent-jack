@@ -237,6 +237,17 @@ export const DELETE_MENU = `
   }
 `;
 
+export const MENU_QUERY = `
+  query Menu($id: ID!) {
+    menu(id: $id) {
+      id name description image fixedPrice currentPrice lowestPrice highestPrice
+      step unitsPerStep demandUnits pricingEnabled isEnable tags subCategoryId
+      variants { id name price }
+      addons { id name price }
+    }
+  }
+`;
+
 export const GET_CART = `
   query GetCart($id: ID!) {
     getCart(id: $id) {
