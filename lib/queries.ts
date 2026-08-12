@@ -261,6 +261,19 @@ export const ORDERS_QUERY = `
   }
 `;
 
+export const DASHBOARD_ORDERS_QUERY = `
+  query DashboardOrders {
+    orders(limit: 200) {
+      id orderNumber status totalAmount guestName createdAt
+      table { id name }
+      items {
+        id quantity salePrice
+        menu { id name pricingEnabled }
+      }
+    }
+  }
+`;
+
 export const ADMIN_FORCE = `
   mutation AdminForce($menuId: ID!, $action: String!) {
     adminForcePrice(menuId: $menuId, action: $action) {
