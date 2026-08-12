@@ -5,9 +5,20 @@ import { generateBidChatReply } from "../services/openai.js";
 import { adminForcePrice } from "../services/pricing.js";
 import { createCheckoutSession } from "../services/stripe.js";
 import {
+  adminApplyStamp,
+  getMyRewards,
+  getRewardSettings,
+  getStampCtx,
+  mapRewardSettings,
+  memberStampForOrder,
+  orderAdminInclude,
+  restoreRedemption,
+  rewardSettingsInclude,
+} from "../services/rewards.js";
+import { RewardRedeemOn } from "@prisma/client";
+import {
   beltInclude,
   cartInclude,
-  dec,
   mapBelt,
   mapMenu,
   mapPage,
@@ -27,6 +38,73 @@ const DateTime = new GraphQLScalarType({
   parseLiteral: (ast) =>
     ast.kind === Kind.STRING ? new Date(ast.value) : null,
 });
+
+function mapOrder(o: any, stampCtx?: Awaited<ReturnType<typeof getStampCtx>>) {
+  return {
+    ...o,
+    totalAmount: Number(o.totalAmount),
+    pointsRedeemed: Number(o.pointsRedeemed || 0),
+    pointsDiscountNzd: Number(o.pointsDiscountNzd || 0),
+    stampRedeemed: Boolean(o.stampRedeemed),
+    pointsEarned: Number(o.pointsEarned || 0),
+    stampsEarned: Number(o.stampsEarned || 0),
+    stampMenu: o.stampMenu ? mapMenu(o.stampMenu) : null,
+    user: o.user
+      ? {
+          id: o.user.id,
+          clerkId: o.user.clerkId,
+          email: o.user.email,
+          name: o.user.name,
+          role: o.user.role,
+        }
+      : null,
+    memberStamp: stampCtx ? memberStampForOrder(o, stampCtx) : null,
+    items: o.items.map((i: any) => ({
+      ...i,
+      salePrice: Number(i.salePrice),
+      menu: i.menu ? mapMenu(i.menu) : null,
+    })),
+  };
+}
+
+function mapAdminUser(
+  user: {
+    id: string;
+    name: string | null;
+    email: string | null;
+    role: string;
+    createdAt: Date;
+    reward?: { pointsBalance: number; stampsBalance: number } | null;
+    ledger?: {
+      id: string;
+      orderId: string | null;
+      type: string;
+      pointsDelta: number;
+      stampsDelta: number;
+      note: string | null;
+      createdAt: Date;
+    }[];
+    _count?: { orders: number };
+  },
+  stampsRequired: number,
+) {
+  const pointsBalance = user.reward?.pointsBalance ?? 0;
+  const stampsBalance = user.reward?.stampsBalance ?? 0;
+  const required = Math.max(1, stampsRequired);
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    createdAt: user.createdAt,
+    pointsBalance,
+    stampsBalance,
+    stampsRequired: required,
+    readyCount: Math.floor(stampsBalance / required),
+    orderCount: user._count?.orders ?? 0,
+    ledger: user.ledger || [],
+  };
+}
 
 function mapCart(cart: any) {
   return {
@@ -199,27 +277,20 @@ export const resolvers = {
       });
       return cart ? mapCart(cart) : null;
     },
-    orders: async (_: unknown, { limit }: { limit?: number }, ctx: GraphQLContext) => {
+    orders: async (
+      _: unknown,
+      { limit, userId }: { limit?: number; userId?: string | null },
+      ctx: GraphQLContext,
+    ) => {
       requireAdmin(ctx);
+      const stampCtx = await getStampCtx();
       const orders = await prisma.order.findMany({
-        take: limit || 50,
+        where: userId ? { userId } : undefined,
+        take: limit || 500,
         orderBy: { createdAt: "desc" },
-        include: {
-          table: true,
-          items: {
-            include: { menu: true, menuVariant: true, combo: true },
-          },
-        },
+        include: orderAdminInclude,
       });
-      return orders.map((o) => ({
-        ...o,
-        totalAmount: Number(o.totalAmount),
-        items: o.items.map((i) => ({
-          ...i,
-          salePrice: Number(i.salePrice),
-          menu: i.menu ? mapMenu(i.menu) : null,
-        })),
-      }));
+      return orders.map((o) => mapOrder(o, stampCtx));
     },
     myOrders: async (
       _: unknown,
@@ -246,36 +317,57 @@ export const resolvers = {
           },
         },
       });
-      return orders.map((o) => ({
-        ...o,
-        totalAmount: Number(o.totalAmount),
-        items: o.items.map((i) => ({
-          ...i,
-          salePrice: Number(i.salePrice),
-          menu: i.menu ? mapMenu(i.menu) : null,
-        })),
-      }));
+      return orders.map((o) => mapOrder(o));
     },
     order: async (_: unknown, { id }: { id: string }) => {
+      const stampCtx = await getStampCtx();
       const o = await prisma.order.findUnique({
         where: { id },
-        include: {
-          table: true,
-          items: { include: { menu: true, menuVariant: true, combo: true } },
-        },
+        include: orderAdminInclude,
       });
       if (!o) return null;
-      return {
-        ...o,
-        totalAmount: Number(o.totalAmount),
-        items: o.items.map((i) => ({
-          ...i,
-          salePrice: Number(i.salePrice),
-          menu: i.menu ? mapMenu(i.menu) : null,
-        })),
-      };
+      return mapOrder(o, stampCtx);
     },
     me: (_: unknown, __: unknown, ctx: GraphQLContext) => ctx.user,
+    rewardSettings: async () => mapRewardSettings(await getRewardSettings()),
+    myRewards: async (
+      _: unknown,
+      { cartId }: { cartId?: string | null },
+      ctx: GraphQLContext,
+    ) => {
+      const user = requireUser(ctx);
+      return getMyRewards(user.id, cartId);
+    },
+    adminUsers: async (_: unknown, __: unknown, ctx: GraphQLContext) => {
+      requireAdmin(ctx);
+      const settings = await getRewardSettings();
+      const users = await prisma.user.findMany({
+        orderBy: { createdAt: "desc" },
+        include: {
+          reward: true,
+          _count: { select: { orders: true } },
+        },
+      });
+      return users.map((u) => mapAdminUser(u, settings.stampsRequired));
+    },
+    adminUser: async (
+      _: unknown,
+      { id }: { id: string },
+      ctx: GraphQLContext,
+    ) => {
+      requireAdmin(ctx);
+      const settings = await getRewardSettings();
+      const user = await prisma.user.findUnique({
+        where: { id },
+        include: {
+          reward: true,
+          _count: { select: { orders: true } },
+          ledger: { orderBy: { createdAt: "desc" }, take: 100 },
+        },
+      });
+      if (!user) return null;
+      return mapAdminUser(user, settings.stampsRequired);
+    },
   },
 
   Mutation: {
@@ -466,6 +558,8 @@ export const resolvers = {
         guestEmail?: string;
         successUrl: string;
         cancelUrl: string;
+        redeemPoints?: boolean | null;
+        redeemStampMenuId?: string | null;
       },
       ctx: GraphQLContext,
     ) => {
@@ -797,29 +891,99 @@ export const resolvers = {
         },
       });
     },
+    updateRewardSettings: async (
+      _: unknown,
+      { input }: { input: any },
+      ctx: GraphQLContext,
+    ) => {
+      requireAdmin(ctx);
+      const existing = await getRewardSettings();
+      const pointsPerDollar = Number(input.pointsPerDollar ?? existing.pointsPerDollar);
+      const pointsToRedeem = Math.floor(
+        Number(input.pointsToRedeem ?? existing.pointsToRedeem),
+      );
+      const rewardAmountNzd = Number(
+        input.rewardAmountNzd ?? existing.rewardAmountNzd,
+      );
+      const stampsRequired = Math.floor(
+        Number(input.stampsRequired ?? existing.stampsRequired),
+      );
+      if (!Number.isFinite(pointsPerDollar) || pointsPerDollar < 0) {
+        throw new Error("Points per dollar must be 0 or more");
+      }
+      if (!Number.isFinite(pointsToRedeem) || pointsToRedeem < 1) {
+        throw new Error("Points to redeem must be at least 1");
+      }
+      if (!Number.isFinite(rewardAmountNzd) || rewardAmountNzd < 0) {
+        throw new Error("Reward amount must be 0 or more");
+      }
+      if (!Number.isFinite(stampsRequired) || stampsRequired < 1) {
+        throw new Error("Stamps required must be at least 1");
+      }
+      const redeemOn = (input.redeemOn || existing.redeemOn) as RewardRedeemOn;
+      if (!["FOOD", "LIQUOR", "BOTH"].includes(redeemOn)) {
+        throw new Error("Redeem on must be Food, Liquor, or Both");
+      }
+
+      await prisma.rewardSettings.update({
+        where: { id: existing.id },
+        data: {
+          enabled: input.enabled ?? existing.enabled,
+          pointsPerDollar,
+          pointsToRedeem,
+          rewardAmountNzd,
+          redeemOn,
+          stampsEnabled: input.stampsEnabled ?? existing.stampsEnabled,
+          stampsRequired,
+        },
+      });
+
+      if (input.stampMenuIds != null) {
+        const ids = (input.stampMenuIds as string[]).filter(Boolean);
+        await prisma.rewardStampMenu.deleteMany({
+          where: { rewardSettingsId: existing.id },
+        });
+        if (ids.length) {
+          await prisma.rewardStampMenu.createMany({
+            data: ids.map((menuId) => ({
+              rewardSettingsId: existing.id,
+              menuId,
+            })),
+          });
+        }
+      }
+
+      const updated = await prisma.rewardSettings.findUniqueOrThrow({
+        where: { id: existing.id },
+        include: rewardSettingsInclude,
+      });
+      return mapRewardSettings(updated);
+    },
     updateOrderStatus: async (
       _: unknown,
       { id, status }: { id: string; status: string },
       ctx: GraphQLContext,
     ) => {
       requireAdmin(ctx);
+      const current = await prisma.order.findUnique({ where: { id } });
+      if (status === "CANCELLED" && current?.status === "PENDING") {
+        await restoreRedemption(id);
+      }
       const o = await prisma.order.update({
         where: { id },
         data: { status: status as any },
-        include: {
-          table: true,
-          items: { include: { menu: true, menuVariant: true, combo: true } },
-        },
+        include: orderAdminInclude,
       });
-      return {
-        ...o,
-        totalAmount: Number(o.totalAmount),
-        items: o.items.map((i) => ({
-          ...i,
-          salePrice: Number(i.salePrice),
-          menu: i.menu ? mapMenu(i.menu) : null,
-        })),
-      };
+      return mapOrder(o, await getStampCtx());
+    },
+    adminApplyStamp: async (
+      _: unknown,
+      { orderId, menuId }: { orderId: string; menuId?: string | null },
+      ctx: GraphQLContext,
+    ) => {
+      requireAdmin(ctx);
+      const order = await adminApplyStamp(orderId, menuId);
+      return mapOrder(order, await getStampCtx());
     },
   },
 

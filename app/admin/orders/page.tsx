@@ -1,11 +1,20 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import clsx from "clsx";
 import toast from "react-hot-toast";
 import { money } from "@/lib/cart";
 import { adminGql } from "@/lib/admin";
-import { ORDERS_QUERY, UPDATE_ORDER_STATUS } from "@/lib/queries";
+import { usePagedSearch } from "@/lib/admin-list";
+import {
+  ADMIN_APPLY_STAMP,
+  ORDERS_QUERY,
+  UPDATE_ORDER_STATUS,
+} from "@/lib/queries";
+import {
+  AdminPagination,
+  AdminSearchBar,
+} from "@/components/admin/AdminListControls";
 
 type OrderItem = {
   id: string;
@@ -25,7 +34,22 @@ type Order = {
   guestEmail?: string | null;
   note?: string | null;
   createdAt: string;
+  stampsEarned: number;
+  stampRedeemed: boolean;
+  pointsRedeemed: number;
+  pointsDiscountNzd: number;
+  pointsEarned: number;
   table?: { id: string; name: string } | null;
+  user?: { id: string; name?: string | null; email?: string | null } | null;
+  stampMenu?: { id: string; name: string } | null;
+  memberStamp?: {
+    pointsBalance: number;
+    stampsBalance: number;
+    stampsRequired: number;
+    readyCount: number;
+    canApply: boolean;
+    eligibleItems: { id: string; name: string }[];
+  } | null;
   items: OrderItem[];
 };
 
@@ -81,6 +105,27 @@ export default function AdminOrdersPage() {
   );
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
+  const statusFiltered = useMemo(() => {
+    if (filter === "ALL") return orders;
+    return orders.filter((o) => o.status === filter);
+  }, [orders, filter]);
+
+  const getSearchText = useCallback(
+    (order: Order) =>
+      [
+        order.orderNumber,
+        order.guestName,
+        order.guestEmail,
+        order.user?.name,
+        order.user?.email,
+        order.table?.name,
+      ]
+        .filter(Boolean)
+        .join(" "),
+    [],
+  );
+  const list = usePagedSearch(statusFiltered, getSearchText);
+
   async function load() {
     const data = await adminGql<{ orders: Order[] }>(ORDERS_QUERY);
     setOrders(data.orders);
@@ -100,10 +145,7 @@ export default function AdminOrdersPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  const filtered = useMemo(() => {
-    if (filter === "ALL") return orders;
-    return orders.filter((o) => o.status === filter);
-  }, [orders, filter]);
+  const filtered = statusFiltered;
 
   const selected =
     filtered.find((o) => o.id === selectedId) ||
@@ -170,12 +212,23 @@ export default function AdminOrdersPage() {
         </div>
       </div>
 
+      <div className="no-print max-w-xl">
+        <AdminSearchBar
+          value={list.query}
+          onChange={list.setQuery}
+          placeholder="Search by order number or name…"
+        />
+      </div>
+
       <div className="no-print flex flex-wrap gap-2">
         {(["ALL", ...STATUSES] as const).map((s) => (
           <button
             key={s}
             type="button"
-            onClick={() => setFilter(s)}
+            onClick={() => {
+              setFilter(s);
+              list.setPage(1);
+            }}
             className={clsx(
               "rounded-full px-3 py-1.5 text-xs font-semibold uppercase tracking-wide transition",
               filter === s
@@ -203,12 +256,12 @@ export default function AdminOrdersPage() {
       ) : (
         <div className="no-print grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
           <div className="space-y-2">
-            {filtered.length === 0 ? (
+            {list.pageItems.length === 0 ? (
               <div className="surface-card rounded-2xl p-6 text-sm text-[var(--muted)]">
-                No orders in this status.
+                No orders match this search.
               </div>
             ) : (
-              filtered.map((order) => {
+              list.pageItems.map((order) => {
                 const active = order.id === selected?.id;
                 const itemCount = order.items.reduce(
                   (n, i) => n + i.quantity,
@@ -239,6 +292,21 @@ export default function AdminOrdersPage() {
                         <div className="mt-1 text-xs text-[var(--muted)]">
                           {formatWhen(order.createdAt)}
                         </div>
+                        {order.pointsRedeemed > 0 ? (
+                          <div className="mt-1 text-[11px] font-bold text-sky-800">
+                            {order.pointsRedeemed} pts applied · −
+                            {money(Number(order.pointsDiscountNzd))}
+                          </div>
+                        ) : null}
+                        {order.stampRedeemed ? (
+                          <div className="mt-1 text-[11px] font-bold text-emerald-800">
+                            Stamp applied
+                          </div>
+                        ) : order.memberStamp?.canApply ? (
+                          <div className="mt-1 text-[11px] font-bold text-[var(--brand)]">
+                            {order.memberStamp.stampsRequired} stamps ready
+                          </div>
+                        ) : null}
                       </div>
                       <div className="shrink-0 text-right">
                         <div className="font-bold text-[var(--ink)]">
@@ -253,6 +321,12 @@ export default function AdminOrdersPage() {
                 );
               })
             )}
+            <AdminPagination
+              page={list.page}
+              totalPages={list.totalPages}
+              total={list.total}
+              onPageChange={list.setPage}
+            />
           </div>
 
           <div className="surface-card sticky top-20 h-fit rounded-2xl p-5 sm:p-6">
@@ -265,6 +339,7 @@ export default function AdminOrdersPage() {
                 order={selected}
                 onStatus={(status) => setStatus(selected.id, status)}
                 onPrint={printSelected}
+                onApplied={load}
               />
             )}
           </div>
@@ -285,11 +360,39 @@ function OrderDetail({
   order,
   onStatus,
   onPrint,
+  onApplied,
 }: {
   order: Order;
   onStatus: (status: string) => void;
   onPrint: () => void;
+  onApplied: () => Promise<void>;
 }) {
+  const stamp = order.memberStamp;
+  const [stampMenuId, setStampMenuId] = useState(
+    stamp?.eligibleItems[0]?.id || "",
+  );
+  const [applying, setApplying] = useState(false);
+
+  useEffect(() => {
+    setStampMenuId(stamp?.eligibleItems[0]?.id || "");
+  }, [order.id, stamp?.eligibleItems]);
+
+  async function applyStamp() {
+    setApplying(true);
+    try {
+      await adminGql(ADMIN_APPLY_STAMP, {
+        orderId: order.id,
+        menuId: stampMenuId || null,
+      });
+      await onApplied();
+      toast.success("Free stamp added to this order");
+    } catch (err: any) {
+      toast.error(err.message || "Could not apply stamp");
+    } finally {
+      setApplying(false);
+    }
+  }
+
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -315,7 +418,50 @@ function OrderDetail({
         <Meta label="Guest" value={order.guestName || "Guest"} />
         <Meta label="Email" value={order.guestEmail || "—"} />
         <Meta label="Total" value={money(Number(order.totalAmount))} strong />
+        <Meta
+          label="Points applied"
+          value={
+            order.pointsRedeemed > 0
+              ? `${order.pointsRedeemed} pts (−${money(Number(order.pointsDiscountNzd))})`
+              : "None"
+          }
+        />
+        <Meta
+          label="Stamp applied"
+          value={
+            order.stampRedeemed
+              ? `1 free${order.stampMenu?.name ? ` ${order.stampMenu.name}` : ""}`
+              : "None"
+          }
+        />
       </div>
+
+      {(order.pointsRedeemed > 0 || order.pointsEarned > 0) && (
+        <div className="rounded-xl border border-[var(--line)] px-3 py-3">
+          <div className="text-[11px] font-semibold uppercase tracking-wider text-[var(--muted)]">
+            Points
+          </div>
+          <p className="mt-1 text-sm">
+            {order.pointsRedeemed > 0 ? (
+              <>
+                <span className="font-semibold">
+                  {order.pointsRedeemed} points applied
+                </span>
+                {" · "}
+                {money(Number(order.pointsDiscountNzd))} off this order
+              </>
+            ) : (
+              <span className="text-[var(--muted)]">No points redeemed</span>
+            )}
+          </p>
+          {order.pointsEarned > 0 ? (
+            <p className="mt-1 text-xs text-[var(--muted)]">
+              This order earned {order.pointsEarned} point
+              {order.pointsEarned === 1 ? "" : "s"}.
+            </p>
+          ) : null}
+        </div>
+      )}
 
       {order.note ? (
         <div className="rounded-xl bg-[var(--page)] px-3 py-2 text-sm">
@@ -323,6 +469,90 @@ function OrderDetail({
           {order.note}
         </div>
       ) : null}
+
+      <div className="rounded-xl border border-[var(--line)] px-3 py-3">
+        <div className="text-[11px] font-semibold uppercase tracking-wider text-[var(--muted)]">
+          Stamp card
+        </div>
+        {!order.user ? (
+          <p className="mt-1 text-sm text-[var(--muted)]">
+            Guest order — no stamp card. Customer must be signed in to earn
+            stamps.
+          </p>
+        ) : !stamp ? (
+          <p className="mt-1 text-sm text-[var(--muted)]">
+            Stamp card is off, or this member has no card yet.
+          </p>
+        ) : (
+          <div className="mt-2 space-y-2">
+            <p className="text-sm">
+              <span className="font-semibold">
+                {order.user.name || order.guestName || "Member"}
+              </span>
+              {" · "}
+              {stamp.stampsBalance} / {stamp.stampsRequired} stamps
+              {stamp.readyCount > 0
+                ? ` · ${stamp.readyCount} free item${stamp.readyCount === 1 ? "" : "s"} ready`
+                : ""}
+            </p>
+            {order.stampsEarned > 0 ? (
+              <p className="text-xs text-[var(--muted)]">
+                This order earned {order.stampsEarned} stamp
+                {order.stampsEarned === 1 ? "" : "s"}.
+              </p>
+            ) : null}
+            {order.stampRedeemed ? (
+              <p className="text-sm font-bold text-emerald-800">
+                Free stamp on this order
+                {order.stampMenu?.name ? `: 1× ${order.stampMenu.name}` : ""}
+              </p>
+            ) : stamp.canApply ? (
+              <div className="space-y-2">
+                {stamp.eligibleItems.length > 1 ? (
+                  <select
+                    className="input !py-2 text-sm"
+                    value={stampMenuId}
+                    onChange={(e) => setStampMenuId(e.target.value)}
+                  >
+                    {stamp.eligibleItems.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        1 free {item.name}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <p className="text-sm text-[var(--muted)]">
+                    Will make 1× {stamp.eligibleItems[0]?.name} free on this
+                    order.
+                  </p>
+                )}
+                <button
+                  type="button"
+                  className="btn btn-primary w-full"
+                  disabled={applying}
+                  onClick={applyStamp}
+                >
+                  {applying
+                    ? "Applying…"
+                    : `Apply ${stamp.stampsRequired} stamps to this order`}
+                </button>
+              </div>
+            ) : stamp.eligibleItems.length === 0 ? (
+              <p className="text-sm text-[var(--muted)]">
+                {stamp.readyCount > 0
+                  ? "Member has a free item ready, but this order has no stamp-card item. Add one, then apply."
+                  : `Need ${stamp.stampsRequired - (stamp.stampsBalance % stamp.stampsRequired)} more stamp${stamp.stampsRequired - (stamp.stampsBalance % stamp.stampsRequired) === 1 ? "" : "s"} for a free item.`}
+              </p>
+            ) : (
+              <p className="text-sm text-[var(--muted)]">
+                Need {stamp.stampsRequired - stamp.stampsBalance} more stamp
+                {stamp.stampsRequired - stamp.stampsBalance === 1 ? "" : "s"}{" "}
+                for a free item.
+              </p>
+            )}
+          </div>
+        )}
+      </div>
 
       <div>
         <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
@@ -340,6 +570,13 @@ function OrderDetail({
                     {item.quantity}×
                   </span>
                   {itemLabel(item)}
+                  {order.stampRedeemed &&
+                  order.stampMenu?.id &&
+                  item.menu?.id === order.stampMenu.id ? (
+                    <span className="ml-2 text-[11px] font-bold uppercase text-emerald-800">
+                      1 free stamp
+                    </span>
+                  ) : null}
                 </div>
                 {item.menu?.pricingEnabled ? (
                   <div className="mt-0.5 text-xs font-semibold text-[var(--brand)]">
@@ -423,6 +660,26 @@ function PrintTicket({ order }: { order: Order }) {
         <div>{formatWhen(order.createdAt)}</div>
       </div>
 
+      {order.pointsRedeemed > 0 || order.stampRedeemed ? (
+        <div className="border-2 border-black p-2">
+          <div className="text-xs font-black uppercase tracking-wider">
+            Rewards applied
+          </div>
+          {order.pointsRedeemed > 0 ? (
+            <div className="mt-1 font-bold">
+              {order.pointsRedeemed} points (−
+              {money(Number(order.pointsDiscountNzd))})
+            </div>
+          ) : null}
+          {order.stampRedeemed ? (
+            <div className="mt-1 font-bold">
+              STAMP: 1 FREE
+              {order.stampMenu?.name ? ` ${order.stampMenu.name}` : " ITEM"}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
       {order.note ? (
         <div className="border border-dashed border-black p-2">
           <strong>Note:</strong> {order.note}
@@ -435,6 +692,11 @@ function PrintTicket({ order }: { order: Order }) {
             <div>
               <div className="font-bold">
                 {item.quantity}× {itemLabel(item)}
+                {order.stampRedeemed &&
+                order.stampMenu?.id &&
+                item.menu?.id === order.stampMenu.id
+                  ? " — 1 FREE STAMP"
+                  : ""}
               </div>
               <div className="text-[11px]">
                 @ {money(Number(item.salePrice))}

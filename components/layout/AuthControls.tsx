@@ -29,8 +29,16 @@ export function AuthControls() {
         </SignInButton>
       </SignedOut>
       <SignedIn>
-        <div className="flex min-h-11 min-w-11 items-center justify-center">
-          <UserButton afterSignOutUrl="/" />
+        <div className="flex items-center gap-2">
+          <Link
+            href="/rewards"
+            className="btn btn-secondary hidden !min-h-11 !rounded-full !px-3 text-sm sm:inline-flex sm:!px-4"
+          >
+            Rewards
+          </Link>
+          <div className="flex min-h-11 min-w-11 items-center justify-center">
+            <UserButton afterSignOutUrl="/" />
+          </div>
         </div>
       </SignedIn>
     </>

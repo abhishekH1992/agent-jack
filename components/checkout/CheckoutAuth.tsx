@@ -67,7 +67,8 @@ function ClerkCheckoutFields(props: {
         )}
       </div>
       <p className="mb-3 text-sm text-[var(--muted)]">
-        Continue as guest or sign in with Google, Facebook, or Apple.
+        Continue as guest or sign in with Google, Facebook, or Apple. Sign in
+        to earn and redeem rewards.
       </p>
       <Fields {...props} />
     </>

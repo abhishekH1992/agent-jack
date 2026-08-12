@@ -303,6 +303,8 @@ export const CHECKOUT = `
     $guestEmail: String
     $successUrl: String!
     $cancelUrl: String!
+    $redeemPoints: Boolean
+    $redeemStampMenuId: ID
   ) {
     createCheckoutSession(
       cartId: $cartId
@@ -311,6 +313,8 @@ export const CHECKOUT = `
       guestEmail: $guestEmail
       successUrl: $successUrl
       cancelUrl: $cancelUrl
+      redeemPoints: $redeemPoints
+      redeemStampMenuId: $redeemStampMenuId
     ) { url sessionId orderId }
   }
 `;
@@ -324,10 +328,17 @@ export const LIQUOR_MENUS = `
 `;
 
 export const ORDERS_QUERY = `
-  query Orders {
-    orders(limit: 100) {
+  query Orders($userId: ID) {
+    orders(limit: 500, userId: $userId) {
       id orderNumber status totalAmount guestName guestEmail note createdAt
+      pointsEarned stampsEarned stampRedeemed pointsRedeemed pointsDiscountNzd
       table { id name }
+      user { id name email }
+      stampMenu { id name }
+      memberStamp {
+        pointsBalance stampsBalance stampsRequired readyCount canApply
+        eligibleItems { id name }
+      }
       items {
         id quantity salePrice
         menu { id name pricingEnabled }
@@ -392,6 +403,19 @@ export const UPDATE_ORDER_STATUS = `
   }
 `;
 
+export const ADMIN_APPLY_STAMP = `
+  mutation AdminApplyStamp($orderId: ID!, $menuId: ID) {
+    adminApplyStamp(orderId: $orderId, menuId: $menuId) {
+      id stampRedeemed stampsEarned
+      stampMenu { id name }
+      memberStamp {
+        pointsBalance stampsBalance stampsRequired readyCount canApply
+        eligibleItems { id name }
+      }
+    }
+  }
+`;
+
 export const UPDATE_SITE = `
   mutation UpdateSite($input: SiteInput!) {
     updateSite(input: $input) { id name email logo banners }
@@ -405,3 +429,69 @@ export const UPSERT_ME = `
     }
   }
 `;
+
+const REWARD_SETTINGS_FIELDS = `
+  id enabled pointsPerDollar pointsToRedeem rewardAmountNzd redeemOn
+  stampsEnabled stampsRequired
+  stampMenus { id menu { id name image } }
+`;
+
+export const REWARD_SETTINGS_QUERY = `
+  query RewardSettings {
+    rewardSettings { ${REWARD_SETTINGS_FIELDS} }
+  }
+`;
+
+export const MY_REWARDS_QUERY = `
+  query MyRewards($cartId: ID) {
+    myRewards(cartId: $cartId) {
+      pointsBalance stampsBalance
+      settings { ${REWARD_SETTINGS_FIELDS} }
+      preview {
+        qualifyingSubtotal maxDiscountNzd pointsToSpend canRedeemStamp
+        stampDiscountNzd
+        stampMenusInCart { id name }
+      }
+      ledger {
+        id orderId type pointsDelta stampsDelta note createdAt
+      }
+    }
+  }
+`;
+
+export const UPDATE_REWARD_SETTINGS = `
+  mutation UpdateRewardSettings($input: RewardSettingsInput!) {
+    updateRewardSettings(input: $input) { ${REWARD_SETTINGS_FIELDS} }
+  }
+`;
+
+export const ORDER_BY_ID_QUERY = `
+  query OrderById($id: ID!) {
+    order(id: $id) {
+      id orderNumber status totalAmount pointsEarned stampsEarned
+      pointsRedeemed pointsDiscountNzd stampRedeemed
+    }
+  }
+`;
+
+export const ADMIN_USERS_QUERY = `
+  query AdminUsers {
+    adminUsers {
+      id name email role createdAt
+      pointsBalance stampsBalance stampsRequired readyCount orderCount
+    }
+  }
+`;
+
+export const ADMIN_USER_QUERY = `
+  query AdminUser($id: ID!) {
+    adminUser(id: $id) {
+      id name email role createdAt
+      pointsBalance stampsBalance stampsRequired readyCount orderCount
+      ledger {
+        id orderId type pointsDelta stampsDelta note createdAt
+      }
+    }
+  }
+`;
+

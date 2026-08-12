@@ -18,6 +18,7 @@ const links = [
   { href: "/liquor", label: "Liquor menu" },
   { href: "/cart", label: "Cart", showCount: true },
   { href: "/orders", label: "Orders", signedInOnly: true },
+  { href: "/rewards", label: "Rewards", signedInOnly: true },
   { href: "/privacy-policy", label: "Privacy Policy" },
   { href: "/terms-and-conditions", label: "Terms and Conditions" },
 ];

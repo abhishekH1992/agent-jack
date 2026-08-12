@@ -304,6 +304,10 @@ const menuTree: CatSeed[] = [
 
 async function main() {
   // Wipe
+  await prisma.rewardLedger.deleteMany();
+  await prisma.userReward.deleteMany();
+  await prisma.rewardStampMenu.deleteMany();
+  await prisma.rewardSettings.deleteMany();
   await prisma.bidAttempt.deleteMany();
   await prisma.priceEvent.deleteMany();
   await prisma.orderItemAddon.deleteMany();
@@ -369,6 +373,7 @@ async function main() {
   let liquorCategoryId = "";
   const burgerMenuIds: string[] = [];
   const pizzaMenuIds: string[] = [];
+  const coffeeStampIds: string[] = [];
 
   for (const block of menuTree) {
     const categorySlug = slugify(block.category);
@@ -442,6 +447,7 @@ async function main() {
         });
         if (sub.name === "BURGER") burgerMenuIds.push(menu.id);
         if (sub.name === "PIZZA") pizzaMenuIds.push(menu.id);
+        if (sub.name === "COFFEE") coffeeStampIds.push(menu.id);
       }
     }
   }
@@ -697,6 +703,21 @@ async function main() {
 `.trim(),
           },
         ],
+      },
+    },
+  });
+
+  await prisma.rewardSettings.create({
+    data: {
+      enabled: true,
+      pointsPerDollar: 1,
+      pointsToRedeem: 100,
+      rewardAmountNzd: 5,
+      redeemOn: "BOTH",
+      stampsEnabled: true,
+      stampsRequired: 9,
+      stampMenus: {
+        create: coffeeStampIds.map((menuId) => ({ menuId })),
       },
     },
   });

@@ -202,8 +202,39 @@ export const typeDefs = `#graphql
     guestEmail: String
     note: String
     table: Table
+    user: User
     items: [OrderItem!]!
     createdAt: DateTime!
+    pointsRedeemed: Int!
+    pointsDiscountNzd: Float!
+    stampRedeemed: Boolean!
+    stampMenu: Menu
+    pointsEarned: Int!
+    stampsEarned: Int!
+    memberStamp: MemberStampInfo
+  }
+
+  type MemberStampInfo {
+    pointsBalance: Int!
+    stampsBalance: Int!
+    stampsRequired: Int!
+    readyCount: Int!
+    canApply: Boolean!
+    eligibleItems: [Menu!]!
+  }
+
+  type AdminUser {
+    id: ID!
+    name: String
+    email: String
+    role: String!
+    createdAt: DateTime!
+    pointsBalance: Int!
+    stampsBalance: Int!
+    stampsRequired: Int!
+    readyCount: Int!
+    orderCount: Int!
+    ledger: [RewardLedgerEntry!]!
   }
 
   type User {
@@ -238,6 +269,56 @@ export const typeDefs = `#graphql
     step: Float!
   }
 
+  enum RewardRedeemOn {
+    FOOD
+    LIQUOR
+    BOTH
+  }
+
+  type RewardStampMenu {
+    id: ID!
+    menu: Menu!
+  }
+
+  type RewardSettings {
+    id: ID!
+    enabled: Boolean!
+    pointsPerDollar: Float!
+    pointsToRedeem: Int!
+    rewardAmountNzd: Float!
+    redeemOn: RewardRedeemOn!
+    stampsEnabled: Boolean!
+    stampsRequired: Int!
+    stampMenus: [RewardStampMenu!]!
+  }
+
+  type RewardLedgerEntry {
+    id: ID!
+    orderId: ID
+    type: String!
+    pointsDelta: Int!
+    stampsDelta: Int!
+    note: String
+    createdAt: DateTime!
+  }
+
+  type RewardPreview {
+    qualifyingSubtotal: Float!
+    maxDiscountNzd: Float!
+    pointsToSpend: Int!
+    canRedeemStamp: Boolean!
+    stampDiscountNzd: Float!
+    stampMenusInCart: [Menu!]!
+  }
+
+  type MyRewards {
+    pointsBalance: Int!
+    stampsBalance: Int!
+    settings: RewardSettings!
+    ledger: [RewardLedgerEntry!]!
+    preview: RewardPreview
+  }
+
   type Query {
     site: Site
     tables: [Table!]!
@@ -253,11 +334,15 @@ export const typeDefs = `#graphql
     page(id: ID!): Page
     pageBySlug(slug: String!): Page
     getCart(id: ID!): Cart
-    orders(limit: Int): [Order!]!
+    orders(limit: Int, userId: ID): [Order!]!
     # Logged-in customer's own orders (by userId or matching guest email)
     myOrders(limit: Int): [Order!]!
     order(id: ID!): Order
     me: User
+    rewardSettings: RewardSettings!
+    myRewards(cartId: ID): MyRewards!
+    adminUsers: [AdminUser!]!
+    adminUser(id: ID!): AdminUser
   }
 
   input CartInput {
@@ -388,6 +473,17 @@ export const typeDefs = `#graphql
     blocks: [PageBlockInput!]
   }
 
+  input RewardSettingsInput {
+    enabled: Boolean
+    pointsPerDollar: Float
+    pointsToRedeem: Int
+    rewardAmountNzd: Float
+    redeemOn: RewardRedeemOn
+    stampsEnabled: Boolean
+    stampsRequired: Int
+    stampMenuIds: [ID!]
+  }
+
   type Mutation {
     createCart(input: CartInput!): Cart!
     updateCart(id: ID!, tableId: ID, note: String): Cart!
@@ -412,6 +508,8 @@ export const typeDefs = `#graphql
       guestEmail: String
       successUrl: String!
       cancelUrl: String!
+      redeemPoints: Boolean
+      redeemStampMenuId: ID
     ): CheckoutResult!
     upsertMe(clerkId: String!, email: String, name: String, role: String): User!
     storeTable(input: TableInput!): Table!
@@ -437,6 +535,8 @@ export const typeDefs = `#graphql
     deletePage(id: ID!): Boolean!
     adminForcePrice(menuId: ID!, action: String!): PriceState!
     updateSite(input: SiteInput!): Site!
+    updateRewardSettings(input: RewardSettingsInput!): RewardSettings!
     updateOrderStatus(id: ID!, status: String!): Order!
+    adminApplyStamp(orderId: ID!, menuId: ID): Order!
   }
 `;

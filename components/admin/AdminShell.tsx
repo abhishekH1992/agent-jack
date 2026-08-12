@@ -14,6 +14,8 @@ const links = [
   { href: "/admin/categories", label: "Categories" },
   { href: "/admin/subcategories", label: "Subcategories" },
   { href: "/admin/menus", label: "Menu" },
+  { href: "/admin/users", label: "Users" },
+  { href: "/admin/rewards", label: "Rewards" },
   { href: "/admin/pages", label: "Pages" },
   { href: "/admin/settings", label: "Settings" },
 ];
