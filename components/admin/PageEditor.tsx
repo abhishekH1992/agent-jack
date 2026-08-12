@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
@@ -34,6 +35,17 @@ import {
   serializeMenuBrowseConfig,
   type MenuBrowseConfig,
 } from "@/lib/menu-browse";
+
+const PageRichTextEditor = dynamic(
+  () =>
+    import("@/components/admin/PageRichTextEditor").then(
+      (mod) => mod.PageRichTextEditor,
+    ),
+  {
+    ssr: false,
+    loading: () => <div className="rich-text-editor min-h-48" />,
+  },
+);
 
 type BlockType = "IMAGE" | "RICH_TEXT" | "BELT" | "MENU_BROWSE";
 
@@ -510,17 +522,16 @@ export function PageEditor({ pageId }: { pageId?: string }) {
                 ) : null}
 
                 {block.type === "RICH_TEXT" ? (
-                  <label className="block space-y-1 text-sm">
-                    <span className="text-[var(--muted)]">HTML content</span>
-                    <textarea
-                      className="input min-h-40 font-mono text-sm"
+                  <div className="space-y-1 text-sm">
+                    <span className="text-[var(--muted)]">Content</span>
+                    <PageRichTextEditor
+                      key={block.id}
                       value={block.content}
-                      onChange={(e) =>
-                        updateBlock(block.id, { content: e.target.value })
+                      onChange={(content) =>
+                        updateBlock(block.id, { content })
                       }
-                      placeholder="<p>Your content…</p>"
                     />
-                  </label>
+                  </div>
                 ) : null}
 
                 {block.type === "MENU_BROWSE" ? (
