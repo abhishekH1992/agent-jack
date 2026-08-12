@@ -367,6 +367,28 @@ export const ORDERS_QUERY = `
   }
 `;
 
+export const ORDER_QUERY = `
+  query Order($id: ID!) {
+    order(id: $id) {
+      id orderNumber status totalAmount guestName guestEmail note createdAt
+      pointsEarned stampsEarned stampRedeemed pointsRedeemed pointsDiscountNzd
+      table { id name }
+      user { id name email }
+      stampMenu { id name }
+      memberStamp {
+        pointsBalance stampsBalance stampsRequired readyCount canApply
+        eligibleItems { id name }
+      }
+      items {
+        id quantity salePrice
+        menu { id name pricingEnabled }
+        menuVariant { id name }
+        combo { id name }
+      }
+    }
+  }
+`;
+
 export const MY_ORDERS_QUERY = `
   query MyOrders {
     myOrders(limit: 50) {
