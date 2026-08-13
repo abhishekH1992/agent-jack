@@ -2,15 +2,19 @@ import { randomUUID } from "crypto";
 import { mkdir, writeFile } from "fs/promises";
 import path from "path";
 import { NextRequest, NextResponse } from "next/server";
+import {
+  publicUploadPath,
+  uploadDir,
+  UPLOAD_FOLDERS,
+} from "@/lib/uploads";
 
-const MAX_BYTES = 8 * 1024 * 1024; // 8MB each
+const MAX_BYTES = 8 * 1024 * 1024;
 const ALLOWED = new Set([
   "image/jpeg",
   "image/png",
   "image/webp",
   "image/gif",
 ]);
-const FOLDERS = new Set(["banners", "images"]);
 
 function extFor(type: string, fallbackName: string) {
   if (type === "image/jpeg") return ".jpg";
@@ -35,7 +39,9 @@ export async function POST(req: NextRequest) {
   }
 
   const folderRaw = String(form.get("folder") || "images");
-  const folder = FOLDERS.has(folderRaw) ? folderRaw : "images";
+  const folder = UPLOAD_FOLDERS.includes(folderRaw as (typeof UPLOAD_FOLDERS)[number])
+    ? folderRaw
+    : "images";
 
   const files = form
     .getAll("files")
@@ -45,7 +51,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "No files uploaded" }, { status: 400 });
   }
 
-  const dir = path.join(process.cwd(), "public", "uploads", folder);
+  const dir = uploadDir(folder);
   await mkdir(dir, { recursive: true });
 
   const urls: string[] = [];
@@ -67,7 +73,7 @@ export async function POST(req: NextRequest) {
     const buffer = Buffer.from(await file.arrayBuffer());
     const filename = `${Date.now()}-${randomUUID().slice(0, 8)}${extFor(file.type, file.name)}`;
     await writeFile(path.join(dir, filename), buffer);
-    urls.push(`/uploads/${folder}/${filename}`);
+    urls.push(publicUploadPath(folder, filename));
   }
 
   return NextResponse.json({ urls });

@@ -6,7 +6,7 @@ import {
   clerkClient,
 } from "@clerk/nextjs/server";
 
-const isAdminRoute = createRouteMatcher(["/admin(.*)", "/api/upload(.*)"]);
+const isAdminRoute = createRouteMatcher(["/admin(.*)", "/api/upload"]);
 
 function isAdminUser(user: {
   publicMetadata?: Record<string, unknown> | null;
