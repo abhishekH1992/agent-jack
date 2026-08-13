@@ -1,7 +1,7 @@
 import { readFile, stat } from "fs/promises";
 import path from "path";
 import { NextRequest, NextResponse } from "next/server";
-import { uploadDir, UPLOAD_FOLDERS } from "@/lib/uploads";
+import { uploadFileCandidates, UPLOAD_FOLDERS } from "@/lib/uploads";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -30,13 +30,19 @@ export async function GET(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const filePath = path.join(uploadDir(folder), filename);
-  try {
-    const info = await stat(filePath);
-    if (!info.isFile()) {
-      return NextResponse.json({ error: "Not found" }, { status: 404 });
+  let filePath: string | null = null;
+  for (const candidate of uploadFileCandidates(folder, filename)) {
+    try {
+      const info = await stat(candidate);
+      if (info.isFile()) {
+        filePath = candidate;
+        break;
+      }
+    } catch {
+      // try next location
     }
-  } catch {
+  }
+  if (!filePath) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 

@@ -7,7 +7,7 @@ import {
   useEffect,
   useState,
 } from "react";
-import { ensureCart, getCartId } from "@/lib/cart";
+import { ensureCart, getCartId, isStaleTableError, clearTableId } from "@/lib/cart";
 import { gql } from "@/lib/graphql";
 import { GET_CART } from "@/lib/queries";
 
@@ -53,7 +53,11 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       const data = await gql<{ getCart: Cart | null }>(GET_CART, { id });
       setCart(data.getCart);
     } catch (err) {
-      console.error(err);
+      if (isStaleTableError(err)) {
+        clearTableId();
+      } else {
+        console.error(err);
+      }
     } finally {
       setLoading(false);
     }

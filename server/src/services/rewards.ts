@@ -119,7 +119,7 @@ function comboItemWeight(ci: {
 
 /** Line amount a FOOD/LIQUOR coupon may discount (prorates mixed combos). */
 function qualifyingLineAmount(
-  item: Parameters<typeof buildRewardLines>[0],
+  item: Parameters<typeof buildRewardLines>[0][number],
   applyOn: RewardRedeemOn,
 ) {
   const linePrice = lineUnitPrice(item) * item.quantity;
@@ -460,6 +460,20 @@ export async function restoreRedemption(orderId: string) {
 export async function awardEarnForPaidOrder(orderId: string) {
   const settings = await getRewardSettings();
   if (!settings.enabled) return;
+
+  const linked = await prisma.order.findUnique({ where: { id: orderId } });
+  if (!linked) return;
+  if (!linked.userId && linked.guestEmail) {
+    const user = await prisma.user.findFirst({
+      where: { email: { equals: linked.guestEmail, mode: "insensitive" } },
+    });
+    if (user) {
+      await prisma.order.update({
+        where: { id: orderId },
+        data: { userId: user.id },
+      });
+    }
+  }
 
   const order = await prisma.order.findUnique({
     where: { id: orderId },

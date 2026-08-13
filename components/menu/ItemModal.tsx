@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Button, Modal, useOverlayState } from "@heroui/react";
 import toast from "react-hot-toast";
-import { ensureCart, money } from "@/lib/cart";
+import { clearTableId, ensureCart, isStaleTableError, money } from "@/lib/cart";
 import { gql } from "@/lib/graphql";
 import { ADD_CART_ITEM } from "@/lib/queries";
 import { useCart } from "@/components/cart/CartProvider";
@@ -94,6 +94,29 @@ export function ItemModal({
       toast.success("Added to cart — nice pick!");
       onClose();
     } catch (err: any) {
+      if (isStaleTableError(err)) {
+        clearTableId();
+        try {
+          const cartId = await ensureCart();
+          await gql(ADD_CART_ITEM, {
+            input: {
+              cartId,
+              menuId: menu.id,
+              menuVariantId: variantId || undefined,
+              quantity: qty,
+              salePrice: unit,
+              addonIds,
+            },
+          });
+          await refresh();
+          toast.success("Added to cart — nice pick!");
+          onClose();
+          return;
+        } catch {
+          // fall through without showing the table FK error
+        }
+        return;
+      }
       toast.error(err.message || "Could not add item");
     } finally {
       setBusy(false);

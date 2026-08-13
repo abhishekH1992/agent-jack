@@ -587,6 +587,7 @@ export const typeDefs = `#graphql
       redeemPoints: Boolean
       redeemStampMenuId: ID
     ): CheckoutResult!
+    confirmCheckout(orderId: ID, sessionId: String): Order!
     upsertMe(clerkId: String!, email: String, name: String, role: String): User!
     storeTable(input: TableInput!): Table!
     updateTable(id: ID!, input: TableInput!): Table!
