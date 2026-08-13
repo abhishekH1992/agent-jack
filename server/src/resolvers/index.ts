@@ -15,6 +15,8 @@ import {
 } from "../services/coupons.js";
 import {
   adminApplyStamp,
+  adminGrantPoints,
+  adminGrantStamps,
   getMyRewards,
   getRewardSettings,
   getStampCtx,
@@ -25,6 +27,12 @@ import {
   rewardSettingsInclude,
 } from "../services/rewards.js";
 import { RewardRedeemOn } from "@prisma/client";
+import {
+  createAdmin,
+  deleteAdmin as removeAdminAccess,
+  listAdmins,
+} from "../services/admins.js";
+import { resolvePersistedRole } from "../services/roles.js";
 import {
   beltInclude,
   cartInclude,
@@ -411,6 +419,12 @@ export const resolvers = {
       if (!user) return null;
       return mapAdminUser(user, settings.stampsRequired);
     },
+    admins: async (_: unknown, __: unknown, ctx: GraphQLContext) => {
+      requireAdmin(ctx);
+      const settings = await getRewardSettings();
+      const users = await listAdmins();
+      return users.map((u) => mapAdminUser(u, settings.stampsRequired));
+    },
     coupons: async (_: unknown, __: unknown, ctx: GraphQLContext) => {
       requireAdmin(ctx);
       const rows = await prisma.coupon.findMany({
@@ -706,12 +720,11 @@ export const resolvers = {
       const existing = await prisma.user.findUnique({
         where: { clerkId: args.clerkId },
       });
-      // Never trust client-provided role elevation; only seed admin email is promoted.
-      const role =
-        existing?.role === "admin" ||
-        email?.toLowerCase() === "admin@example.com"
-          ? "admin"
-          : "customer";
+      // Never trust client-provided role elevation; keep staff roles as stored.
+      const role = resolvePersistedRole({
+        existingRole: existing?.role,
+        email,
+      });
 
       return prisma.user.upsert({
         where: { clerkId: args.clerkId },
@@ -1155,6 +1168,60 @@ export const resolvers = {
       requireAdmin(ctx);
       const order = await adminApplyStamp(orderId, menuId);
       return mapOrder(order, await getStampCtx());
+    },
+    storeAdmin: async (
+      _: unknown,
+      { input }: { input: { name: string; email: string; password: string } },
+      ctx: GraphQLContext,
+    ) => {
+      requireAdmin(ctx);
+      const settings = await getRewardSettings();
+      const user = await createAdmin(input);
+      return mapAdminUser(user, settings.stampsRequired);
+    },
+    deleteAdmin: async (
+      _: unknown,
+      { id }: { id: string },
+      ctx: GraphQLContext,
+    ) => {
+      requireAdmin(ctx);
+      return removeAdminAccess(id, ctx.user?.id);
+    },
+    adminGrantPoints: async (
+      _: unknown,
+      args: { userId: string; points: number; note?: string | null },
+      ctx: GraphQLContext,
+    ) => {
+      requireAdmin(ctx);
+      await adminGrantPoints(args.userId, args.points, args.note);
+      const settings = await getRewardSettings();
+      const user = await prisma.user.findUniqueOrThrow({
+        where: { id: args.userId },
+        include: {
+          reward: true,
+          _count: { select: { orders: true } },
+          ledger: { orderBy: { createdAt: "desc" }, take: 100 },
+        },
+      });
+      return mapAdminUser(user, settings.stampsRequired);
+    },
+    adminGrantStamps: async (
+      _: unknown,
+      args: { userId: string; stamps: number; note?: string | null },
+      ctx: GraphQLContext,
+    ) => {
+      requireAdmin(ctx);
+      await adminGrantStamps(args.userId, args.stamps, args.note);
+      const settings = await getRewardSettings();
+      const user = await prisma.user.findUniqueOrThrow({
+        where: { id: args.userId },
+        include: {
+          reward: true,
+          _count: { select: { orders: true } },
+          ledger: { orderBy: { createdAt: "desc" }, take: 100 },
+        },
+      });
+      return mapAdminUser(user, settings.stampsRequired);
     },
   },
 

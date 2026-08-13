@@ -5,6 +5,7 @@ import Link from "next/link";
 import toast from "react-hot-toast";
 import { adminGql } from "@/lib/admin";
 import { usePagedSearch } from "@/lib/admin-list";
+import { isStaffRole, roleLabel } from "@/lib/roles";
 import { ADMIN_USERS_QUERY } from "@/lib/queries";
 import {
   AdminPagination,
@@ -97,9 +98,9 @@ export default function AdminUsersPage() {
                     >
                       {user.name || "Unnamed"}
                     </Link>
-                    {user.role === "admin" ? (
+                    {isStaffRole(user.role) ? (
                       <span className="ml-2 text-[11px] font-bold uppercase text-[var(--muted)]">
-                        admin
+                        {roleLabel(user.role)}
                       </span>
                     ) : null}
                   </td>

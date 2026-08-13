@@ -735,3 +735,57 @@ export async function adminApplyStamp(orderId: string, menuId?: string | null) {
     include: orderAdminInclude,
   });
 }
+
+export async function adminGrantPoints(
+  userId: string,
+  points: number,
+  note?: string | null,
+) {
+  const amount = Math.floor(Number(points) || 0);
+  if (amount < 1) throw new Error("Add at least 1 point");
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) throw new Error("User not found");
+
+  await prisma.$transaction(async (tx) => {
+    await ensureUserReward(userId, tx);
+    await tx.userReward.update({
+      where: { userId },
+      data: { pointsBalance: { increment: amount } },
+    });
+    await tx.rewardLedger.create({
+      data: {
+        userId,
+        type: RewardLedgerType.EARN_POINTS,
+        pointsDelta: amount,
+        note: note?.trim() || `Admin added ${amount} point${amount === 1 ? "" : "s"}`,
+      },
+    });
+  });
+}
+
+export async function adminGrantStamps(
+  userId: string,
+  stamps: number,
+  note?: string | null,
+) {
+  const amount = Math.floor(Number(stamps) || 0);
+  if (amount < 1) throw new Error("Add at least 1 stamp");
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) throw new Error("User not found");
+
+  await prisma.$transaction(async (tx) => {
+    await ensureUserReward(userId, tx);
+    await tx.userReward.update({
+      where: { userId },
+      data: { stampsBalance: { increment: amount } },
+    });
+    await tx.rewardLedger.create({
+      data: {
+        userId,
+        type: RewardLedgerType.EARN_STAMP,
+        stampsDelta: amount,
+        note: note?.trim() || `Admin added ${amount} stamp${amount === 1 ? "" : "s"}`,
+      },
+    });
+  });
+}

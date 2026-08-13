@@ -14,7 +14,7 @@ function isAdminUser(user: {
   emailAddresses?: Array<{ emailAddress?: string | null }>;
 }) {
   const metaRole = user.publicMetadata?.role;
-  if (metaRole === "admin") return true;
+  if (metaRole === "admin" || metaRole === "superadmin") return true;
 
   const emails = [
     user.primaryEmailAddress?.emailAddress,
