@@ -3,7 +3,13 @@
 import { useEffect, useRef, useState } from "react";
 import { Button, Modal, Spinner, useOverlayState } from "@heroui/react";
 import toast from "react-hot-toast";
-import { ensureCart, getBidSessionId, money } from "@/lib/cart";
+import {
+  clearTableId,
+  ensureCart,
+  getBidSessionId,
+  isStaleTableError,
+  money,
+} from "@/lib/cart";
 import { gql } from "@/lib/graphql";
 import { DELETE_CART_ITEM, PLACE_BID } from "@/lib/queries";
 import { useCart } from "@/components/cart/CartProvider";
@@ -277,6 +283,10 @@ export function BidChatModal({
         toast.error("Couldn’t complete that — try again.");
       }
     } catch (err: any) {
+      if (isStaleTableError(err)) {
+        clearTableId();
+        return;
+      }
       toast.error(err.message || "Bid failed");
       if (mode === "chat") {
         setMessages((m) => [

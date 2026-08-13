@@ -3,7 +3,11 @@ import { prisma } from "../prisma.js";
 import { GraphQLContext, requireAdmin, requireUser } from "../context.js";
 import { generateBidChatReply } from "../services/openai.js";
 import { adminForcePrice } from "../services/pricing.js";
-import { createCheckoutSession } from "../services/stripe.js";
+import {
+  confirmPaidOrder,
+  createCheckoutSession,
+} from "../services/stripe.js";
+import { resolveTableId } from "../services/tables.js";
 import { previewCouponQuote } from "../services/checkout-quote.js";
 import {
   couponWriteData,
@@ -478,9 +482,10 @@ export const resolvers = {
 
   Mutation: {
     createCart: async (_: unknown, { input }: { input: any }) => {
+      const tableId = await resolveTableId(input.tableId);
       const cart = await prisma.cart.create({
         data: {
-          tableId: input.tableId || undefined,
+          tableId,
           guestId: input.guestId || undefined,
           userId: input.userId || undefined,
           note: input.note || undefined,
@@ -496,7 +501,9 @@ export const resolvers = {
       const cart = await prisma.cart.update({
         where: { id },
         data: {
-          tableId: tableId || undefined,
+          ...(tableId !== undefined
+            ? { tableId: (await resolveTableId(tableId)) ?? null }
+            : {}),
           note: note ?? undefined,
         },
         include: cartInclude,
@@ -673,8 +680,22 @@ export const resolvers = {
     ) => {
       return createCheckoutSession({
         ...args,
+        tableId: await resolveTableId(args.tableId),
         userId: ctx.user?.id,
       });
+    },
+    confirmCheckout: async (
+      _: unknown,
+      args: { orderId?: string | null; sessionId?: string | null },
+      ctx: GraphQLContext,
+    ) => {
+      const stampCtx = await getStampCtx();
+      const o = await confirmPaidOrder({
+        orderId: args.orderId,
+        sessionId: args.sessionId,
+        userId: ctx.user?.id,
+      });
+      return mapOrder(o, stampCtx);
     },
     upsertMe: async (
       _: unknown,

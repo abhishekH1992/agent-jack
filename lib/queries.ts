@@ -533,6 +533,16 @@ export const ORDER_BY_ID_QUERY = `
   }
 `;
 
+export const CONFIRM_CHECKOUT = `
+  mutation ConfirmCheckout($orderId: ID, $sessionId: String) {
+    confirmCheckout(orderId: $orderId, sessionId: $sessionId) {
+      id orderNumber status totalAmount pointsEarned stampsEarned
+      pointsRedeemed pointsDiscountNzd stampRedeemed
+      stampMenu { id name }
+    }
+  }
+`;
+
 export const ADMIN_USERS_QUERY = `
   query AdminUsers {
     adminUsers {

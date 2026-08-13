@@ -6,8 +6,10 @@ import {
   awardEarnForPaidOrder,
   deductRedemption,
   injectOrderId,
+  orderAdminInclude,
   restoreRedemption,
 } from "./rewards.js";
+import { resolveTableId } from "./tables.js";
 
 export function getStripe() {
   const key = process.env.STRIPE_SECRET_KEY;
@@ -15,6 +17,16 @@ export function getStripe() {
     throw new Error("STRIPE_SECRET_KEY is not configured");
   }
   return new Stripe(key);
+}
+
+async function findUserIdByEmail(email?: string | null) {
+  const trimmed = email?.trim();
+  if (!trimmed) return undefined;
+  const user = await prisma.user.findFirst({
+    where: { email: { equals: trimmed, mode: "insensitive" } },
+    select: { id: true },
+  });
+  return user?.id;
 }
 
 export async function createCheckoutSession(input: {
@@ -104,12 +116,17 @@ export async function createCheckoutSession(input: {
   const stripeDiscountNzd = Math.round((discountNzd + couponDiscountNzd) * 100) / 100;
   const kitchenNote = (input.note ?? cart.note)?.trim() || undefined;
   const orderNumber = `AJ-${Date.now().toString().slice(-8)}`;
+  const tableId = await resolveTableId(input.tableId || cart.tableId);
+  const userId =
+    input.userId ||
+    cart.userId ||
+    (await findUserIdByEmail(input.guestEmail));
   const order = await prisma.order.create({
     data: {
       orderNumber,
       cartId: cart.id,
-      tableId: input.tableId || cart.tableId,
-      userId: input.userId || cart.userId,
+      tableId,
+      userId,
       guestName: input.guestName || undefined,
       guestEmail: input.guestEmail || undefined,
       note: kitchenNote,
@@ -140,9 +157,9 @@ export async function createCheckoutSession(input: {
   });
 
   try {
-    if (input.userId && (pointsSpent > 0 || stampMenuId)) {
+    if (userId && (pointsSpent > 0 || stampMenuId)) {
       await deductRedemption({
-        userId: input.userId,
+        userId,
         orderId: order.id,
         pointsSpent,
         discountNzd,
@@ -203,16 +220,24 @@ export async function createCheckoutSession(input: {
   }
 }
 
-export async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
-  const orderId = session.metadata?.orderId;
-  if (!orderId) return;
-
-  const order = await prisma.order.findUnique({
-    where: { id: orderId },
-    include: {
-      items: { include: { menu: true } },
-    },
-  });
+export async function handleCheckoutCompleted(
+  session: Stripe.Checkout.Session,
+  orderIdOverride?: string | null,
+) {
+  const orderId = orderIdOverride || session.metadata?.orderId || undefined;
+  const order = orderId
+    ? await prisma.order.findUnique({
+        where: { id: orderId },
+        include: {
+          items: { include: { menu: true } },
+        },
+      })
+    : await prisma.order.findFirst({
+        where: { stripeSessionId: session.id },
+        include: {
+          items: { include: { menu: true } },
+        },
+      });
   if (!order) return;
 
   const alreadyPaid =
@@ -220,7 +245,7 @@ export async function handleCheckoutCompleted(session: Stripe.Checkout.Session) 
 
   if (!alreadyPaid) {
     await prisma.order.update({
-      where: { id: orderId },
+      where: { id: order.id },
       data: { status: "PAID" },
     });
 
@@ -243,7 +268,79 @@ export async function handleCheckoutCompleted(session: Stripe.Checkout.Session) 
     }
   }
 
-  await awardEarnForPaidOrder(orderId);
+  await awardEarnForPaidOrder(order.id);
+}
+
+async function attachOrderUser(
+  orderId: string,
+  userId?: string | null,
+) {
+  const order = await prisma.order.findUnique({ where: { id: orderId } });
+  if (!order) return null;
+  if (order.userId) return order;
+  if (userId) {
+    return prisma.order.update({
+      where: { id: orderId },
+      data: { userId },
+    });
+  }
+  const email = order.guestEmail?.trim();
+  if (!email) return order;
+  const user = await prisma.user.findFirst({
+    where: { email: { equals: email, mode: "insensitive" } },
+  });
+  if (!user) return order;
+  return prisma.order.update({
+    where: { id: orderId },
+    data: { userId: user.id },
+  });
+}
+
+export async function confirmPaidOrder(input: {
+  orderId?: string | null;
+  sessionId?: string | null;
+  userId?: string | null;
+}) {
+  let order = input.orderId
+    ? await prisma.order.findUnique({ where: { id: input.orderId } })
+    : null;
+  if (!order && input.sessionId) {
+    order = await prisma.order.findFirst({
+      where: { stripeSessionId: input.sessionId },
+    });
+  }
+  if (!order) {
+    throw new Error("Order not found");
+  }
+
+  const attached = await attachOrderUser(order.id, input.userId);
+  if (attached) order = attached;
+
+  const sessionId = input.sessionId || order.stripeSessionId;
+  if (sessionId) {
+    try {
+      const stripe = getStripe();
+      const session = await stripe.checkout.sessions.retrieve(sessionId);
+      const paid =
+        session.payment_status === "paid" ||
+        session.payment_status === "no_payment_required" ||
+        session.status === "complete";
+      if (paid) {
+        await handleCheckoutCompleted(session, order.id);
+      }
+    } catch (err) {
+      console.error("confirmPaidOrder Stripe lookup failed", err);
+    }
+  } else if (order.status === "PAID" || order.status === "FULFILLED") {
+    await awardEarnForPaidOrder(order.id);
+  }
+
+  const fresh = await prisma.order.findUnique({
+    where: { id: order!.id },
+    include: orderAdminInclude,
+  });
+  if (!fresh) throw new Error("Order not found");
+  return fresh;
 }
 
 export async function handleCheckoutExpired(session: Stripe.Checkout.Session) {

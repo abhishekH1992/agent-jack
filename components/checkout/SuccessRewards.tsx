@@ -7,7 +7,7 @@ import { money } from "@/lib/cart";
 import { CLERK_ENABLED } from "@/lib/config";
 import { useClerkGql } from "@/lib/clerk-headers";
 import { gql } from "@/lib/graphql";
-import { ORDER_BY_ID_QUERY, REWARD_SETTINGS_QUERY } from "@/lib/queries";
+import { CONFIRM_CHECKOUT, REWARD_SETTINGS_QUERY } from "@/lib/queries";
 
 type OrderEarn = {
   id: string;
@@ -19,16 +19,27 @@ type OrderEarn = {
   stampMenu?: { id: string; name: string } | null;
 };
 
-export function SuccessRewards({ orderId }: { orderId?: string }) {
-  if (!CLERK_ENABLED) return <GuestHint />;
+export function SuccessRewards({
+  orderId,
+  sessionId,
+}: {
+  orderId?: string;
+  sessionId?: string;
+}) {
+  if (!CLERK_ENABLED) {
+    return (
+      <>
+        <ConfirmPaid orderId={orderId} sessionId={sessionId} authed={false} />
+        <GuestHint />
+      </>
+    );
+  }
   return (
     <>
+      <ConfirmPaidAuthed orderId={orderId} sessionId={sessionId} />
       <SignedOut>
         <GuestHint />
       </SignedOut>
-      <SignedIn>
-        <EarnedCopy orderId={orderId} />
-      </SignedIn>
     </>
   );
 }
@@ -55,29 +66,53 @@ function GuestHint() {
   );
 }
 
-function EarnedCopy({ orderId }: { orderId?: string }) {
-  const { isSignedIn } = useAuth();
+function ConfirmPaidAuthed({
+  orderId,
+  sessionId,
+}: {
+  orderId?: string;
+  sessionId?: string;
+}) {
   const clerkGql = useClerkGql();
+  return (
+    <ConfirmPaid
+      orderId={orderId}
+      sessionId={sessionId}
+      authed
+      request={clerkGql}
+    />
+  );
+}
+
+function ConfirmPaid({
+  orderId,
+  sessionId,
+  authed,
+  request = gql,
+}: {
+  orderId?: string;
+  sessionId?: string;
+  authed: boolean;
+  request?: typeof gql;
+}) {
   const [order, setOrder] = useState<OrderEarn | null>(null);
 
   useEffect(() => {
-    if (!orderId || !isSignedIn) return;
+    if (!orderId && !sessionId) return;
     let cancelled = false;
     let attempts = 0;
     async function load() {
       try {
-        const data = await clerkGql<{ order: OrderEarn | null }>(
-          ORDER_BY_ID_QUERY,
-          { id: orderId },
+        const data = await request<{ confirmCheckout: OrderEarn }>(
+          CONFIRM_CHECKOUT,
+          { orderId: orderId || null, sessionId: sessionId || null },
         );
         if (cancelled) return;
-        setOrder(data.order);
-        if (
-          data.order &&
-          data.order.pointsEarned === 0 &&
-          data.order.stampsEarned === 0 &&
-          attempts < 6
-        ) {
+        setOrder(data.confirmCheckout);
+        const earned =
+          data.confirmCheckout.pointsEarned > 0 ||
+          data.confirmCheckout.stampsEarned > 0;
+        if (!earned && attempts < 6) {
           attempts += 1;
           window.setTimeout(load, 1500);
         }
@@ -92,7 +127,15 @@ function EarnedCopy({ orderId }: { orderId?: string }) {
     return () => {
       cancelled = true;
     };
-  }, [orderId, isSignedIn, clerkGql]);
+  }, [orderId, sessionId, request]);
+
+  if (!authed) return null;
+  return <EarnedCopy order={order} />;
+}
+
+function EarnedCopy({ order }: { order: OrderEarn | null }) {
+  const { isSignedIn } = useAuth();
+  if (!isSignedIn) return null;
 
   const bits: string[] = [];
   if (order?.pointsEarned) bits.push(`${order.pointsEarned} points`);

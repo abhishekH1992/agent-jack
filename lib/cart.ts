@@ -29,6 +29,17 @@ export function setTableId(id: string) {
   Cookies.set(TABLE_KEY, id, { expires: 7 });
 }
 
+export function clearTableId() {
+  Cookies.remove(TABLE_KEY);
+}
+
+export function isStaleTableError(err: unknown) {
+  const msg = err instanceof Error ? err.message : String(err);
+  return /Cart_tableId_fkey|Order_tableId_fkey|Foreign key constraint|P2003/i.test(
+    msg,
+  );
+}
+
 export function getGuestId() {
   let id = Cookies.get(GUEST_KEY);
   if (!id) {
@@ -60,14 +71,30 @@ export async function ensureCart() {
     }
   }
 
-  const data = await gql<{ createCart: { id: string } }>(CREATE_CART, {
-    input: {
-      tableId: getTableId() || undefined,
-      guestId: getGuestId(),
-    },
-  });
-  setCartId(data.createCart.id);
-  return data.createCart.id;
+  const create = (tableId?: string) =>
+    gql<{ createCart: { id: string; tableId?: string | null } }>(CREATE_CART, {
+      input: {
+        tableId: tableId || undefined,
+        guestId: getGuestId(),
+      },
+    });
+
+  const remember = (cart: { id: string; tableId?: string | null }, requested?: string) => {
+    if (requested && !cart.tableId) clearTableId();
+    setCartId(cart.id);
+    return cart.id;
+  };
+
+  try {
+    const requested = getTableId() || undefined;
+    const data = await create(requested);
+    return remember(data.createCart, requested);
+  } catch (err) {
+    if (!isStaleTableError(err)) throw err;
+    clearTableId();
+    const data = await create();
+    return remember(data.createCart);
+  }
 }
 
 export function cartTotal(

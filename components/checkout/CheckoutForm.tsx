@@ -8,7 +8,9 @@ import toast from "react-hot-toast";
 import {
   cartTotal,
   clearCartId,
+  clearTableId,
   getTableId,
+  isStaleTableError,
   money,
   setTableId,
 } from "@/lib/cart";
@@ -156,7 +158,11 @@ function CheckoutFormBase({
       .then((data) => {
         const active = data.tables.filter((t) => t.isActive);
         setTables(active);
-        setTable((current) => current || active[0]?.id || "");
+        setTable((current) => {
+          if (current && active.some((t) => t.id === current)) return current;
+          if (current) clearTableId();
+          return active[0]?.id || "";
+        });
       })
       .catch(() => undefined);
   }, []);
@@ -233,6 +239,13 @@ function CheckoutFormBase({
       clearCartId();
       window.location.href = data.createCheckoutSession.url;
     } catch (err: any) {
+      if (isStaleTableError(err)) {
+        clearTableId();
+        const fallback = tables[0]?.id || "";
+        setTable(fallback);
+        if (fallback) setTableId(fallback);
+        return;
+      }
       toast.error(err.message || "Checkout failed");
     } finally {
       setBusy(false);

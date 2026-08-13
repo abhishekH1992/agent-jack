@@ -20,7 +20,7 @@ export default async function SuccessPage({
           Payment confirmed. The kitchen and bar have your table order — sit
           back and enjoy.
         </p>
-        <SuccessRewards orderId={params.orderId} />
+        <SuccessRewards orderId={params.orderId} sessionId={params.session_id} />
         <Link
           href="/"
           className="mt-6 inline-flex min-h-12 w-full cursor-pointer items-center justify-center rounded-full bg-[var(--brand)] px-6 text-sm font-semibold text-white sm:w-auto"
