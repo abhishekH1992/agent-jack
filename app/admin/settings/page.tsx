@@ -25,6 +25,11 @@ const SETTING_SECTIONS = [
     body: "Promo codes, dates, min spend, and food or liquor limits.",
   },
   {
+    href: "/admin/settings/admins",
+    title: "Admin",
+    body: "See who can access the admin panel and create new admins.",
+  },
+  {
     href: "/admin/settings/profile",
     title: "Profile",
     body: "Your admin account and sign-in details.",

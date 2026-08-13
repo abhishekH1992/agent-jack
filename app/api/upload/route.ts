@@ -27,7 +27,7 @@ function extFor(type: string, fallbackName: string) {
 
 export async function POST(req: NextRequest) {
   const role = req.headers.get("x-clerk-role");
-  if (role !== "admin") {
+  if (role !== "admin" && role !== "superadmin") {
     return NextResponse.json({ error: "Admin access required" }, { status: 403 });
   }
 

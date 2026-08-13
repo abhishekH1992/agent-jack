@@ -388,6 +388,7 @@ export const typeDefs = `#graphql
     myRewards(cartId: ID): MyRewards!
     adminUsers: [AdminUser!]!
     adminUser(id: ID!): AdminUser
+    admins: [AdminUser!]!
     coupons: [Coupon!]!
     coupon(id: ID!): Coupon
     previewCoupon(
@@ -546,6 +547,12 @@ export const typeDefs = `#graphql
     stampMenuIds: [ID!]
   }
 
+  input AdminInput {
+    name: String!
+    email: String!
+    password: String!
+  }
+
   input CouponInput {
     code: String!
     percentOff: Float!
@@ -618,5 +625,9 @@ export const typeDefs = `#graphql
     deleteCoupon(id: ID!): Boolean!
     updateOrderStatus(id: ID!, status: String!): Order!
     adminApplyStamp(orderId: ID!, menuId: ID): Order!
+    storeAdmin(input: AdminInput!): AdminUser!
+    deleteAdmin(id: ID!): Boolean!
+    adminGrantPoints(userId: ID!, points: Int!, note: String): AdminUser!
+    adminGrantStamps(userId: ID!, stamps: Int!, note: String): AdminUser!
   }
 `;

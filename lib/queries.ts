@@ -574,6 +574,52 @@ export const ADMIN_USER_QUERY = `
   }
 `;
 
+export const ADMINS_QUERY = `
+  query Admins {
+    admins {
+      id name email role createdAt
+    }
+  }
+`;
+
+export const STORE_ADMIN = `
+  mutation StoreAdmin($input: AdminInput!) {
+    storeAdmin(input: $input) {
+      id name email role createdAt
+    }
+  }
+`;
+
+export const DELETE_ADMIN = `
+  mutation DeleteAdmin($id: ID!) {
+    deleteAdmin(id: $id)
+  }
+`;
+
+export const ADMIN_GRANT_POINTS = `
+  mutation AdminGrantPoints($userId: ID!, $points: Int!, $note: String) {
+    adminGrantPoints(userId: $userId, points: $points, note: $note) {
+      id name email role createdAt
+      pointsBalance stampsBalance stampsRequired readyCount orderCount
+      ledger {
+        id orderId type pointsDelta stampsDelta note createdAt
+      }
+    }
+  }
+`;
+
+export const ADMIN_GRANT_STAMPS = `
+  mutation AdminGrantStamps($userId: ID!, $stamps: Int!, $note: String) {
+    adminGrantStamps(userId: $userId, stamps: $stamps, note: $note) {
+      id name email role createdAt
+      pointsBalance stampsBalance stampsRequired readyCount orderCount
+      ledger {
+        id orderId type pointsDelta stampsDelta note createdAt
+      }
+    }
+  }
+`;
+
 export const TABLE_REVENUE_QUERY = `
   query TableRevenue($days: Int) {
     tableRevenue(days: $days) {

@@ -254,7 +254,7 @@ model User {
   clerkId      String         @unique
   email        String?
   name         String?
-  role         String         @default("customer")
+  role         UserRole       @default(customer)
   carts        Cart[]
   orders       Order[]
   bidAttempts  BidAttempt[]
@@ -404,6 +404,12 @@ enum RewardRedeemOn {
   FOOD
   LIQUOR
   BOTH
+}
+
+enum UserRole {
+  customer
+  admin
+  superadmin
 }
 
 enum RewardLedgerType {

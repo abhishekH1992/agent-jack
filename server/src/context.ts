@@ -1,5 +1,6 @@
 import type { Request } from "express";
 import { prisma } from "./prisma.js";
+import { isStaffRole, resolvePersistedRole } from "./services/roles.js";
 
 export type GraphQLContext = {
   req: Request;
@@ -19,7 +20,7 @@ export async function buildContext({ req }: { req: Request }): Promise<GraphQLCo
 
   if (!clerkId) {
     // Local/dev admin tools can pass x-clerk-role without a Clerk session.
-    return { req, user: null, isAdmin: roleHeader === "admin" };
+    return { req, user: null, isAdmin: isStaffRole(roleHeader) };
   }
 
   const email =
@@ -27,12 +28,11 @@ export async function buildContext({ req }: { req: Request }): Promise<GraphQLCo
   const name =
     (req.headers["x-clerk-name"] as string | undefined)?.trim() || undefined;
   const existing = await prisma.user.findUnique({ where: { clerkId } });
-  const role =
-    roleHeader === "admin" ||
-    existing?.role === "admin" ||
-    email?.toLowerCase() === "admin@example.com"
-      ? "admin"
-      : "customer";
+  const role = resolvePersistedRole({
+    existingRole: existing?.role,
+    roleHeader,
+    email,
+  });
 
   const user = await prisma.user.upsert({
     where: { clerkId },
@@ -52,7 +52,7 @@ export async function buildContext({ req }: { req: Request }): Promise<GraphQLCo
   return {
     req,
     user,
-    isAdmin: user.role === "admin" || roleHeader === "admin",
+    isAdmin: isStaffRole(user.role) || isStaffRole(roleHeader),
   };
 }
 

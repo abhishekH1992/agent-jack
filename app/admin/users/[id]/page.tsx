@@ -8,7 +8,13 @@ import toast from "react-hot-toast";
 import { money } from "@/lib/cart";
 import { adminGql } from "@/lib/admin";
 import { usePagedSearch } from "@/lib/admin-list";
-import { ADMIN_USER_QUERY, ORDERS_QUERY } from "@/lib/queries";
+import { isStaffRole, roleLabel } from "@/lib/roles";
+import {
+  ADMIN_GRANT_POINTS,
+  ADMIN_GRANT_STAMPS,
+  ADMIN_USER_QUERY,
+  ORDERS_QUERY,
+} from "@/lib/queries";
 import {
   AdminPagination,
   AdminSearchBar,
@@ -100,6 +106,10 @@ export default function AdminUserDetailPage() {
     "ALL",
   );
   const [openId, setOpenId] = useState<string | null>(null);
+  const [pointsToAdd, setPointsToAdd] = useState("");
+  const [stampsToAdd, setStampsToAdd] = useState("");
+  const [grantNote, setGrantNote] = useState("");
+  const [granting, setGranting] = useState<"points" | "stamps" | null>(null);
 
   const statusFiltered = useMemo(() => {
     if (filter === "ALL") return orders;
@@ -137,6 +147,50 @@ export default function AdminUserDetailPage() {
       .finally(() => setLoading(false));
   }, [id]);
 
+  async function grantPoints() {
+    const points = Math.floor(Number(pointsToAdd));
+    if (!Number.isFinite(points) || points < 1) {
+      return toast.error("Enter at least 1 point");
+    }
+    setGranting("points");
+    try {
+      const data = await adminGql<{ adminGrantPoints: AdminUser }>(
+        ADMIN_GRANT_POINTS,
+        { userId: id, points, note: grantNote.trim() || null },
+      );
+      setUser(data.adminGrantPoints);
+      setPointsToAdd("");
+      setGrantNote("");
+      toast.success(`Added ${points} point${points === 1 ? "" : "s"}`);
+    } catch (err: any) {
+      toast.error(err.message || "Failed");
+    } finally {
+      setGranting(null);
+    }
+  }
+
+  async function grantStamps() {
+    const stamps = Math.floor(Number(stampsToAdd));
+    if (!Number.isFinite(stamps) || stamps < 1) {
+      return toast.error("Enter at least 1 stamp");
+    }
+    setGranting("stamps");
+    try {
+      const data = await adminGql<{ adminGrantStamps: AdminUser }>(
+        ADMIN_GRANT_STAMPS,
+        { userId: id, stamps, note: grantNote.trim() || null },
+      );
+      setUser(data.adminGrantStamps);
+      setStampsToAdd("");
+      setGrantNote("");
+      toast.success(`Added ${stamps} stamp${stamps === 1 ? "" : "s"}`);
+    } catch (err: any) {
+      toast.error(err.message || "Failed");
+    } finally {
+      setGranting(null);
+    }
+  }
+
   if (loading) {
     return (
       <div className="text-sm text-[var(--muted)]">Loading user…</div>
@@ -171,7 +225,7 @@ export default function AdminUserDetailPage() {
         </h1>
         <p className="text-sm text-[var(--muted)]">
           {user.email || "No email"}
-          {user.role === "admin" ? " · Admin" : ""}
+          {isStaffRole(user.role) ? ` · ${roleLabel(user.role)}` : ""}
         </p>
       </div>
 
@@ -190,6 +244,59 @@ export default function AdminUserDetailPage() {
           }
         />
         <Stat label="Orders" value={String(user.orderCount)} />
+      </div>
+
+      <div className="surface-card space-y-3 rounded-2xl p-4">
+        <h2 className="font-semibold">Add rewards</h2>
+        <p className="text-sm text-[var(--muted)]">
+          Credit points or stamps to this member. It shows up in their activity.
+        </p>
+        <input
+          className="input"
+          placeholder="Optional note"
+          value={grantNote}
+          onChange={(e) => setGrantNote(e.target.value)}
+        />
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="flex gap-2">
+            <input
+              className="input"
+              type="number"
+              min={1}
+              inputMode="numeric"
+              placeholder="Points"
+              value={pointsToAdd}
+              onChange={(e) => setPointsToAdd(e.target.value)}
+            />
+            <button
+              type="button"
+              className="btn btn-primary shrink-0"
+              disabled={granting !== null}
+              onClick={grantPoints}
+            >
+              {granting === "points" ? "Adding…" : "Add points"}
+            </button>
+          </div>
+          <div className="flex gap-2">
+            <input
+              className="input"
+              type="number"
+              min={1}
+              inputMode="numeric"
+              placeholder="Stamps"
+              value={stampsToAdd}
+              onChange={(e) => setStampsToAdd(e.target.value)}
+            />
+            <button
+              type="button"
+              className="btn btn-primary shrink-0"
+              disabled={granting !== null}
+              onClick={grantStamps}
+            >
+              {granting === "stamps" ? "Adding…" : "Add stamps"}
+            </button>
+          </div>
+        </div>
       </div>
 
       <div className="flex gap-2">

@@ -80,7 +80,7 @@ async function ensureClerkAdmin(): Promise<string> {
         body: JSON.stringify({
           password: ADMIN_PASSWORD,
           skip_password_checks: true,
-          public_metadata: { role: "admin" },
+          public_metadata: { role: "superadmin" },
           first_name: "Admin",
         }),
       });
@@ -98,7 +98,7 @@ async function ensureClerkAdmin(): Promise<string> {
       skip_password_checks: true,
       first_name: "Admin",
       last_name: "User",
-      public_metadata: { role: "admin" },
+      public_metadata: { role: "superadmin" },
     }),
   });
 
@@ -728,10 +728,10 @@ async function main() {
       clerkId,
       email: ADMIN_EMAIL,
       name: "Admin",
-      role: "admin",
+      role: "superadmin",
     },
   });
-  console.log(`DB admin user: ${ADMIN_EMAIL} (role=admin)`);
+  console.log(`DB admin user: ${ADMIN_EMAIL} (role=superadmin)`);
 
   let basicsCategoryId = "";
   let basicsCategorySlug = "";
