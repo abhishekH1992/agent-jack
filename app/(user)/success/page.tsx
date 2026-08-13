@@ -23,7 +23,7 @@ export default async function SuccessPage({
         <SuccessRewards orderId={params.orderId} />
         <Link
           href="/"
-          className="mt-6 inline-flex min-h-12 w-full cursor-pointer items-center justify-center rounded-full bg-[var(--cta)] px-6 text-sm font-semibold text-white sm:w-auto"
+          className="mt-6 inline-flex min-h-12 w-full cursor-pointer items-center justify-center rounded-full bg-[var(--brand)] px-6 text-sm font-semibold text-white sm:w-auto"
         >
           Back to menu
         </Link>

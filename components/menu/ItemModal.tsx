@@ -203,7 +203,7 @@ export function ItemModal({
                 <div className="flex items-center gap-2">
                   <Button
                     isIconOnly
-                    className="min-h-11 min-w-11 bg-[var(--cta)] text-white"
+                    className="min-h-11 min-w-11 bg-[var(--brand)] text-white"
                     onPress={() => setQty((q) => Math.max(1, q - 1))}
                   >
                     −
@@ -211,7 +211,7 @@ export function ItemModal({
                   <span className="w-8 text-center font-semibold">{qty}</span>
                   <Button
                     isIconOnly
-                    className="min-h-11 min-w-11 bg-[var(--cta)] text-white"
+                    className="min-h-11 min-w-11 bg-[var(--brand)] text-white"
                     onPress={() => setQty((q) => q + 1)}
                   >
                     +
@@ -224,7 +224,7 @@ export function ItemModal({
             </Modal.Body>
             <Modal.Footer className="safe-bottom">
               <Button
-                className="min-h-12 w-full bg-[var(--cta)] font-semibold text-white"
+                className="min-h-12 w-full bg-[var(--brand)] font-semibold text-white"
                 isDisabled={busy}
                 onPress={addToCart}
               >

@@ -87,7 +87,7 @@ function statusTone(status: string) {
     case "PENDING":
       return "bg-amber-100 text-amber-900";
     case "PAID":
-      return "bg-blue-100 text-blue-900";
+      return "bg-amber-100 text-amber-950";
     case "FULFILLED":
       return "bg-emerald-100 text-emerald-900";
     case "CANCELLED":
@@ -472,7 +472,7 @@ export default function AdminDashboard() {
                         row.status === "PENDING"
                           ? "#d97706"
                           : row.status === "PAID"
-                            ? "#2563eb"
+                            ? "#a16207"
                             : row.status === "FULFILLED"
                               ? "#15803d"
                               : "#dc2626",

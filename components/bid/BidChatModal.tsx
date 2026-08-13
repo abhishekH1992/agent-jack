@@ -64,7 +64,7 @@ function QtyStepper({
         isIconOnly
         aria-label="Decrease quantity"
         isDisabled={disabled}
-        className="min-h-11 min-w-11 bg-[var(--cta)] text-white"
+        className="min-h-11 min-w-11 bg-[var(--brand)] text-white"
         onPress={() => onChange(Math.max(1, qty - 1))}
       >
         −
@@ -74,7 +74,7 @@ function QtyStepper({
         isIconOnly
         aria-label="Increase quantity"
         isDisabled={disabled}
-        className="min-h-11 min-w-11 bg-[var(--cta)] text-white"
+        className="min-h-11 min-w-11 bg-[var(--brand)] text-white"
         onPress={() => onChange(Math.min(99, qty + 1))}
       >
         +
@@ -93,13 +93,7 @@ export function BidChatModal({
   onClose: () => void;
 }) {
   const { refresh } = useCart();
-  const state = useOverlayState({
-    isOpen,
-    onOpenChange: (open) => {
-      if (!open) onClose();
-    },
-  });
-
+  const pendingCartItemIdRef = useRef<string | null>(null);
   const [placement, setPlacement] = useState<"bottom" | "center">("bottom");
   const [amountText, setAmountText] = useState("");
   const [qty, setQty] = useState(1);
@@ -112,6 +106,31 @@ export function BidChatModal({
   const [failCount, setFailCount] = useState(0);
   const [liveOffer, setLiveOffer] = useState<number | null>(null);
   const chatScrollRef = useRef<HTMLDivElement>(null);
+
+  pendingCartItemIdRef.current = pendingCartItemId;
+
+  async function discardPendingCartItem() {
+    const id = pendingCartItemIdRef.current;
+    if (!id) return;
+    pendingCartItemIdRef.current = null;
+    setPendingCartItemId(null);
+    setDealReady(false);
+    try {
+      await gql(DELETE_CART_ITEM, { id });
+      await refresh();
+    } catch {
+      // ignore
+    }
+  }
+
+  const state = useOverlayState({
+    isOpen,
+    onOpenChange: (open) => {
+      if (!open) {
+        void discardPendingCartItem().finally(() => onClose());
+      }
+    },
+  });
 
   const min = Number(menu?.lowestPrice ?? menu?.fixedPrice ?? 0);
   const max = Number(menu?.highestPrice ?? menu?.fixedPrice ?? 0);
@@ -236,6 +255,7 @@ export function BidChatModal({
 
         setDealReady(true);
         setPendingCartItemId(data.placeBid.cartItem?.id || null);
+        pendingCartItemIdRef.current = data.placeBid.cartItem?.id || null;
         setMessages((m) => [
           ...m,
           { role: "assistant", content: data.placeBid.message },
@@ -300,22 +320,16 @@ export function BidChatModal({
   }
 
   async function acceptDeal() {
+    pendingCartItemIdRef.current = null;
+    setPendingCartItemId(null);
+    setDealReady(false);
     await refresh();
     toast.success("Locked in — added to cart");
     onClose();
   }
 
   async function declineDeal() {
-    if (pendingCartItemId) {
-      try {
-        await gql(DELETE_CART_ITEM, { id: pendingCartItemId });
-        await refresh();
-      } catch {
-        // ignore
-      }
-    }
-    setPendingCartItemId(null);
-    setDealReady(false);
+    await discardPendingCartItem();
     setMessages((m) => [
       ...m,
       { role: "user", content: "Nah, not this round." },
@@ -418,7 +432,7 @@ export function BidChatModal({
                       Decline
                     </Button>
                     <Button
-                      className="min-h-12 flex-1 bg-[var(--cta)] font-semibold text-white"
+                      className="min-h-12 flex-1 bg-[var(--brand)] font-semibold text-white"
                       onPress={acceptDeal}
                     >
                       Accept
@@ -446,7 +460,7 @@ export function BidChatModal({
                         Decline
                       </Button>
                       <Button
-                        className="min-h-12 flex-1 bg-[var(--cta)] font-semibold text-white"
+                        className="min-h-12 flex-1 bg-[var(--brand)] font-semibold text-white"
                         onPress={acceptLiveOffer}
                         isDisabled={busy}
                       >

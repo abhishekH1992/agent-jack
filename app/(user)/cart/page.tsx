@@ -42,7 +42,7 @@ export default function CartPage() {
             Your cart is empty — time to browse.
           </p>
           <Link href="/" className="mt-4 inline-block cursor-pointer">
-            <Button className="min-h-12 bg-[var(--cta)] font-semibold text-white">
+            <Button className="min-h-12 bg-[var(--brand)] font-semibold text-white">
               Browse menu
             </Button>
           </Link>

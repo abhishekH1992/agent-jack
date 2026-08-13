@@ -53,7 +53,7 @@ function CtaButtons({
           "inline-flex min-h-11 cursor-pointer items-center justify-center rounded-full px-5 text-sm font-semibold transition duration-200 active:scale-[0.98]",
           secondary
             ? "border-2 border-white bg-white/95 text-[var(--brand)] hover:bg-white"
-            : "bg-[var(--cta)] text-white hover:opacity-90",
+            : "bg-[var(--brand)] text-white hover:opacity-90",
         );
         if (external) {
           return (
@@ -176,7 +176,7 @@ function TextHero({
                     "inline-flex min-h-12 cursor-pointer items-center justify-center rounded-full px-6 text-sm font-semibold transition duration-200 active:scale-[0.98]",
                     secondary
                       ? "border-2 border-[var(--brand)] bg-white text-[var(--brand)] hover:bg-[var(--brand-soft)]"
-                      : "bg-[var(--cta)] text-white hover:opacity-90",
+                      : "bg-[var(--brand)] text-white hover:opacity-90",
                   )}
                 >
                   {btn.label}

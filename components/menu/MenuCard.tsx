@@ -78,7 +78,7 @@ export function MenuCard({
           className={
             menu.pricingEnabled
               ? "min-h-11 w-full bg-[var(--brand)] font-bold text-white"
-              : "min-h-11 w-full bg-[var(--cta)] font-semibold text-white"
+              : "min-h-11 w-full bg-[var(--brand)] font-semibold text-white"
           }
           onPress={onClick}
         >
