@@ -2,7 +2,19 @@ import { SignIn } from "@clerk/nextjs";
 import { CLERK_ENABLED } from "@/lib/config";
 import Link from "next/link";
 
-export default function SignInPage() {
+function safeRedirect(url?: string) {
+  if (!url || !url.startsWith("/") || url.startsWith("//")) return "/";
+  return url;
+}
+
+export default async function SignInPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ redirect_url?: string }>;
+}) {
+  const params = await searchParams;
+  const redirectUrl = safeRedirect(params.redirect_url);
+
   if (!CLERK_ENABLED) {
     return (
       <div className="page-shell flex min-h-screen items-center justify-center">
@@ -27,7 +39,10 @@ export default function SignInPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center p-4">
-      <SignIn />
+      <SignIn
+        forceRedirectUrl={redirectUrl}
+        signUpForceRedirectUrl={redirectUrl}
+      />
     </div>
   );
 }

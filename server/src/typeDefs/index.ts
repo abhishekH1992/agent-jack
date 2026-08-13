@@ -50,6 +50,10 @@ export const typeDefs = `#graphql
     highestPrice: Float
     step: Float
     currentPrice: Float
+    # Paid units needed before live price rises by one step (default 5)
+    unitsPerStep: Int!
+    # Progress toward next step (0 .. unitsPerStep-1)
+    demandUnits: Int!
     pricingEnabled: Boolean!
     isEnable: Boolean!
     tags: [String!]!
@@ -115,6 +119,56 @@ export const typeDefs = `#graphql
     menus: [Menu!]!
   }
 
+  enum PageBlockType {
+    IMAGE
+    RICH_TEXT
+    BELT
+    MENU_BROWSE
+  }
+
+  enum ImageLayout {
+    SINGLE
+    COLUMN
+    SLIDER
+  }
+
+  type BannerButton {
+    label: String!
+    href: String!
+    variant: String!
+  }
+
+  type BannerSlide {
+    src: String!
+    header: String
+    subheader: String
+    buttons: [BannerButton!]!
+  }
+
+  type PageBlock {
+    id: ID!
+    type: PageBlockType!
+    sortOrder: Int!
+    isEnable: Boolean!
+    images: [String!]!
+    imageLayout: ImageLayout
+    isBanner: Boolean!
+    buttons: [BannerButton!]!
+    slides: [BannerSlide!]!
+    content: String
+    beltId: ID
+    belt: Belt
+  }
+
+  type Page {
+    id: ID!
+    title: String!
+    slug: String!
+    isEnable: Boolean!
+    sortOrder: Int!
+    blocks: [PageBlock!]!
+  }
+
   type CartItemAddon {
     id: ID!
     menuAddon: MenuAddon!
@@ -156,8 +210,42 @@ export const typeDefs = `#graphql
     guestEmail: String
     note: String
     table: Table
+    user: User
     items: [OrderItem!]!
     createdAt: DateTime!
+    pointsRedeemed: Int!
+    pointsDiscountNzd: Float!
+    coupon: Coupon
+    couponCode: String
+    couponDiscountNzd: Float!
+    stampRedeemed: Boolean!
+    stampMenu: Menu
+    pointsEarned: Int!
+    stampsEarned: Int!
+    memberStamp: MemberStampInfo
+  }
+
+  type MemberStampInfo {
+    pointsBalance: Int!
+    stampsBalance: Int!
+    stampsRequired: Int!
+    readyCount: Int!
+    canApply: Boolean!
+    eligibleItems: [Menu!]!
+  }
+
+  type AdminUser {
+    id: ID!
+    name: String
+    email: String
+    role: String!
+    createdAt: DateTime!
+    pointsBalance: Int!
+    stampsBalance: Int!
+    stampsRequired: Int!
+    readyCount: Int!
+    orderCount: Int!
+    ledger: [RewardLedgerEntry!]!
   }
 
   type User {
@@ -171,6 +259,8 @@ export const typeDefs = `#graphql
   type BidResult {
     success: Boolean!
     failCount: Int!
+    # True after 3 failed bids — client shows live-price Accept offer instead of chat
+    offerLivePrice: Boolean!
     message: String!
     currentPrice: Float!
     cartItem: CartItem
@@ -190,6 +280,90 @@ export const typeDefs = `#graphql
     step: Float!
   }
 
+  enum RewardRedeemOn {
+    FOOD
+    LIQUOR
+    BOTH
+  }
+
+  type RewardStampMenu {
+    id: ID!
+    menu: Menu!
+  }
+
+  type RewardSettings {
+    id: ID!
+    enabled: Boolean!
+    pointsPerDollar: Float!
+    pointsToRedeem: Int!
+    rewardAmountNzd: Float!
+    redeemOn: RewardRedeemOn!
+    stampsEnabled: Boolean!
+    stampsRequired: Int!
+    stampMenus: [RewardStampMenu!]!
+  }
+
+  type RewardLedgerEntry {
+    id: ID!
+    orderId: ID
+    type: String!
+    pointsDelta: Int!
+    stampsDelta: Int!
+    note: String
+    createdAt: DateTime!
+  }
+
+  type RewardPreview {
+    qualifyingSubtotal: Float!
+    maxDiscountNzd: Float!
+    pointsToSpend: Int!
+    canRedeemStamp: Boolean!
+    stampDiscountNzd: Float!
+    stampMenusInCart: [Menu!]!
+  }
+
+  type Coupon {
+    id: ID!
+    code: String!
+    percentOff: Float!
+    minSpendNzd: Float!
+    maxDiscountNzd: Float
+    startsAt: DateTime
+    expiresAt: DateTime
+    allowWithRewards: Boolean!
+    applyOn: RewardRedeemOn!
+    isActive: Boolean!
+    createdAt: DateTime!
+  }
+
+  type CouponPreview {
+    valid: Boolean!
+    message: String!
+    code: String!
+    percentOff: Float!
+    discountNzd: Float!
+    minSpendNzd: Float!
+    maxDiscountNzd: Float
+    allowWithRewards: Boolean!
+    applyOn: RewardRedeemOn!
+    qualifyingSubtotal: Float!
+  }
+
+  type TableRevenue {
+    tableId: ID!
+    tableName: String!
+    orderCount: Int!
+    revenue: Float!
+  }
+
+  type MyRewards {
+    pointsBalance: Int!
+    stampsBalance: Int!
+    settings: RewardSettings!
+    ledger: [RewardLedgerEntry!]!
+    preview: RewardPreview
+  }
+
   type Query {
     site: Site
     tables: [Table!]!
@@ -201,10 +375,28 @@ export const typeDefs = `#graphql
     menus(pricingEnabled: Boolean): [Menu!]!
     combos(isEnable: Boolean): [Combo!]!
     belts(isEnable: Boolean): [Belt!]!
+    pages(isEnable: Boolean): [Page!]!
+    page(id: ID!): Page
+    pageBySlug(slug: String!): Page
     getCart(id: ID!): Cart
-    orders(limit: Int): [Order!]!
+    orders(limit: Int, userId: ID): [Order!]!
+    # Logged-in customer's own orders (by userId or matching guest email)
+    myOrders(limit: Int): [Order!]!
     order(id: ID!): Order
     me: User
+    rewardSettings: RewardSettings!
+    myRewards(cartId: ID): MyRewards!
+    adminUsers: [AdminUser!]!
+    adminUser(id: ID!): AdminUser
+    coupons: [Coupon!]!
+    coupon(id: ID!): Coupon
+    previewCoupon(
+      code: String!
+      cartId: ID!
+      redeemPoints: Boolean
+      redeemStampMenuId: ID
+    ): CouponPreview!
+    tableRevenue(days: Int): [TableRevenue!]!
   }
 
   input CartInput {
@@ -239,6 +431,12 @@ export const typeDefs = `#graphql
     categoryId: ID!
   }
 
+  input MenuOptionInput {
+    id: ID
+    name: String!
+    price: Float!
+  }
+
   input MenuInput {
     name: String!
     description: String
@@ -248,10 +446,15 @@ export const typeDefs = `#graphql
     highestPrice: Float
     step: Float
     currentPrice: Float
+    unitsPerStep: Int
     pricingEnabled: Boolean
     isEnable: Boolean
     tags: [String!]
     subCategoryId: ID!
+    # Size / option variants (e.g. Small, Large)
+    variants: [MenuOptionInput!]
+    # Add-ons (e.g. Extra Cheese)
+    addons: [MenuOptionInput!]
   }
 
   input TableInput {
@@ -297,19 +500,92 @@ export const typeDefs = `#graphql
     menuIds: [ID!]
   }
 
+  input BannerButtonInput {
+    label: String!
+    href: String!
+    variant: String
+  }
+
+  input BannerSlideInput {
+    src: String!
+    header: String
+    subheader: String
+    buttons: [BannerButtonInput!]
+  }
+
+  input PageBlockInput {
+    id: ID
+    type: PageBlockType!
+    sortOrder: Int
+    isEnable: Boolean
+    images: [String!]
+    imageLayout: ImageLayout
+    isBanner: Boolean
+    buttons: [BannerButtonInput!]
+    slides: [BannerSlideInput!]
+    content: String
+    beltId: ID
+  }
+
+  input PageInput {
+    title: String!
+    slug: String
+    isEnable: Boolean
+    sortOrder: Int
+    blocks: [PageBlockInput!]
+  }
+
+  input RewardSettingsInput {
+    enabled: Boolean
+    pointsPerDollar: Float
+    pointsToRedeem: Int
+    rewardAmountNzd: Float
+    redeemOn: RewardRedeemOn
+    stampsEnabled: Boolean
+    stampsRequired: Int
+    stampMenuIds: [ID!]
+  }
+
+  input CouponInput {
+    code: String!
+    percentOff: Float!
+    minSpendNzd: Float
+    maxDiscountNzd: Float
+    startsAt: DateTime
+    expiresAt: DateTime
+    allowWithRewards: Boolean
+    applyOn: RewardRedeemOn
+    isActive: Boolean
+  }
+
   type Mutation {
     createCart(input: CartInput!): Cart!
     updateCart(id: ID!, tableId: ID, note: String): Cart!
     addCartItem(input: CartItemInput!): CartItem!
     deleteCartItem(id: ID!): Boolean!
-    placeBid(menuId: ID!, amount: Float!, cartId: ID!, sessionId: String!): BidResult!
+    placeBid(
+      menuId: ID!
+      amount: Float!
+      cartId: ID!
+      sessionId: String!
+      # Units to add on a winning bid (price still only rises after paid checkout)
+      quantity: Int
+      # 1-based fail attempt in this modal (for chat tone); omit on success / accept-offer
+      chatAttempt: Int
+      # Last assistant line — model must not repeat it
+      lastReply: String
+    ): BidResult!
     createCheckoutSession(
       cartId: ID!
       tableId: ID
       guestName: String
       guestEmail: String
+      note: String
+      couponCode: String
       successUrl: String!
       cancelUrl: String!
+      redeemPoints: Boolean
+      redeemStampMenuId: ID
     ): CheckoutResult!
     upsertMe(clerkId: String!, email: String, name: String, role: String): User!
     storeTable(input: TableInput!): Table!
@@ -330,8 +606,16 @@ export const typeDefs = `#graphql
     storeBelt(input: BeltInput!): Belt!
     updateBelt(id: ID!, input: BeltInput!): Belt!
     deleteBelt(id: ID!): Boolean!
+    storePage(input: PageInput!): Page!
+    updatePage(id: ID!, input: PageInput!): Page!
+    deletePage(id: ID!): Boolean!
     adminForcePrice(menuId: ID!, action: String!): PriceState!
     updateSite(input: SiteInput!): Site!
+    updateRewardSettings(input: RewardSettingsInput!): RewardSettings!
+    storeCoupon(input: CouponInput!): Coupon!
+    updateCoupon(id: ID!, input: CouponInput!): Coupon!
+    deleteCoupon(id: ID!): Boolean!
     updateOrderStatus(id: ID!, status: String!): Order!
+    adminApplyStamp(orderId: ID!, menuId: ID): Order!
   }
 `;

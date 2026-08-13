@@ -7,6 +7,7 @@ import { ensureCart, money } from "@/lib/cart";
 import { gql } from "@/lib/graphql";
 import { ADD_CART_ITEM } from "@/lib/queries";
 import { useCart } from "@/components/cart/CartProvider";
+import { ExpandableDescription } from "@/components/menu/ExpandableDescription";
 
 type Variant = { id: string; name: string; price: number };
 type Addon = { id: string; name: string; price: number };
@@ -15,6 +16,7 @@ export type ModalMenu = {
   id: string;
   name: string;
   description?: string | null;
+  image?: string | null;
   fixedPrice: number;
   currentPrice?: number | null;
   lowestPrice?: number | null;
@@ -112,13 +114,34 @@ export function ItemModal({
         <Modal.Container placement={placement} size="md" scroll="inside">
           <Modal.Dialog className="rounded-t-2xl bg-white sm:rounded-2xl">
             <Modal.Header className="border-b border-[var(--line)] pr-12">
-              <Modal.Heading className="font-display text-xl font-bold">
-                {menu.name}
-              </Modal.Heading>
-              <p className="text-sm text-[var(--muted)]">{menu.description}</p>
+              <div className="flex items-center gap-3">
+                <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-xl bg-[var(--brand-soft)]">
+                  {menu.image ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={menu.image}
+                      alt=""
+                      className="absolute inset-0 h-full w-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-full items-center justify-center bg-[linear-gradient(135deg,#ffedd5,#fdba74)] px-1 text-center text-[10px] font-bold uppercase leading-tight text-[var(--brand)]">
+                      {menu.name.slice(0, 8)}
+                    </div>
+                  )}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <Modal.Heading className="truncate font-display text-xl font-bold">
+                    {menu.name}
+                  </Modal.Heading>
+                </div>
+              </div>
               <Modal.CloseTrigger className="absolute right-2 top-2 min-h-11 min-w-11" />
             </Modal.Header>
             <Modal.Body className="space-y-4 py-4">
+              {menu.description ? (
+                <ExpandableDescription text={menu.description} lines={3} />
+              ) : null}
+
               {menu.variants.length > 0 && (
                 <div>
                   <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
@@ -180,7 +203,7 @@ export function ItemModal({
                 <div className="flex items-center gap-2">
                   <Button
                     isIconOnly
-                    className="min-h-11 min-w-11 bg-[var(--cta)] text-white"
+                    className="min-h-11 min-w-11 bg-[var(--brand)] text-white"
                     onPress={() => setQty((q) => Math.max(1, q - 1))}
                   >
                     −
@@ -188,7 +211,7 @@ export function ItemModal({
                   <span className="w-8 text-center font-semibold">{qty}</span>
                   <Button
                     isIconOnly
-                    className="min-h-11 min-w-11 bg-[var(--cta)] text-white"
+                    className="min-h-11 min-w-11 bg-[var(--brand)] text-white"
                     onPress={() => setQty((q) => q + 1)}
                   >
                     +
@@ -201,7 +224,7 @@ export function ItemModal({
             </Modal.Body>
             <Modal.Footer className="safe-bottom">
               <Button
-                className="min-h-12 w-full bg-[var(--cta)] font-semibold text-white"
+                className="min-h-12 w-full bg-[var(--brand)] font-semibold text-white"
                 isDisabled={busy}
                 onPress={addToCart}
               >

@@ -42,7 +42,7 @@ export default function CartPage() {
             Your cart is empty — time to browse.
           </p>
           <Link href="/" className="mt-4 inline-block cursor-pointer">
-            <Button className="min-h-12 bg-[var(--cta)] font-semibold text-white">
+            <Button className="min-h-12 bg-[var(--brand)] font-semibold text-white">
               Browse menu
             </Button>
           </Link>
@@ -56,36 +56,63 @@ export default function CartPage() {
                 [item.menu?.name, item.menuVariant?.name]
                   .filter(Boolean)
                   .join(" — ");
+              const image = item.combo?.image || item.menu?.image || null;
+              const unit = Number(item.salePrice);
               const addonSum =
                 item.addons?.reduce(
                   (s, a) => s + Number(a.menuAddon.price),
                   0,
                 ) || 0;
+              const unitWithAddons = unit + addonSum;
+              const lineTotal = unitWithAddons * item.quantity;
+
               return (
                 <Card
                   key={item.id}
-                  className="surface-card flex flex-row items-start justify-between gap-3 border-none p-4"
+                  className="surface-card border-none p-3 sm:p-4"
                 >
-                  <div className="min-w-0">
-                    <div className="font-semibold">{name}</div>
-                    <div className="text-sm text-[var(--muted)]">
-                      Qty {item.quantity}
-                      {item.addons?.length
-                        ? ` · ${item.addons.map((a) => a.menuAddon.name).join(", ")}`
-                        : ""}
+                  <div className="flex items-center gap-3 sm:gap-4">
+                    <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-[var(--brand-soft)] sm:h-20 sm:w-20">
+                      {image ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={image}
+                          alt=""
+                          className="absolute inset-0 h-full w-full object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-full items-center justify-center px-1 text-center text-[10px] font-bold uppercase leading-tight text-[var(--brand)]">
+                          {(name || "Item").slice(0, 8)}
+                        </div>
+                      )}
                     </div>
-                  </div>
-                  <div className="shrink-0 text-right">
-                    <div className="font-bold">
-                      {money((Number(item.salePrice) + addonSum) * item.quantity)}
+
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate font-semibold leading-snug">
+                        {name || "Item"}
+                      </div>
+                      {item.addons?.length ? (
+                        <div className="mt-0.5 truncate text-xs text-[var(--muted)]">
+                          {item.addons.map((a) => a.menuAddon.name).join(", ")}
+                        </div>
+                      ) : null}
+                      <div className="mt-1 text-sm text-[var(--muted)]">
+                        Qty {item.quantity} × {money(unitWithAddons)}
+                      </div>
                     </div>
-                    <button
-                      type="button"
-                      className="mt-2 min-h-11 cursor-pointer text-sm font-semibold text-[var(--danger)]"
-                      onClick={() => removeItem(item.id)}
-                    >
-                      Remove
-                    </button>
+
+                    <div className="shrink-0 text-right">
+                      <div className="font-bold tabular-nums">
+                        {money(lineTotal)}
+                      </div>
+                      <button
+                        type="button"
+                        className="mt-1 min-h-10 cursor-pointer text-sm font-semibold text-[var(--danger)]"
+                        onClick={() => removeItem(item.id)}
+                      >
+                        Remove
+                      </button>
+                    </div>
                   </div>
                 </Card>
               );

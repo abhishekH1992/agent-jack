@@ -10,9 +10,9 @@ export const CATEGORIES_QUERY = `
       id name slug image
       categoryType { id name }
       subCategories {
-        id name
+        id name image isEnable
         menus {
-          id name description image fixedPrice currentPrice lowestPrice highestPrice step pricingEnabled tags
+          id name description image fixedPrice currentPrice lowestPrice highestPrice step pricingEnabled tags isEnable
           variants { id name price }
           addons { id name price }
         }
@@ -91,6 +91,63 @@ export const DELETE_BELT = `
   }
 `;
 
+const PAGE_FIELDS = `
+  id title slug isEnable sortOrder
+  blocks {
+    id type sortOrder isEnable images imageLayout isBanner
+    buttons { label href variant }
+    slides { src header subheader buttons { label href variant } }
+    content beltId
+    belt {
+      id name sourceType categoryId subCategoryId isSlider isEnable sortOrder
+      category { id name slug }
+      subCategory { id name }
+      items { id sortOrder menu { id name } }
+      menus {
+        id name description image fixedPrice currentPrice lowestPrice highestPrice step pricingEnabled tags
+        variants { id name price }
+        addons { id name price }
+      }
+    }
+  }
+`;
+
+export const PAGES_QUERY = `
+  query Pages($isEnable: Boolean) {
+    pages(isEnable: $isEnable) { ${PAGE_FIELDS} }
+  }
+`;
+
+export const PAGE_QUERY = `
+  query Page($id: ID!) {
+    page(id: $id) { ${PAGE_FIELDS} }
+  }
+`;
+
+export const PAGE_BY_SLUG = `
+  query PageBySlug($slug: String!) {
+    pageBySlug(slug: $slug) { ${PAGE_FIELDS} }
+  }
+`;
+
+export const STORE_PAGE = `
+  mutation StorePage($input: PageInput!) {
+    storePage(input: $input) { ${PAGE_FIELDS} }
+  }
+`;
+
+export const UPDATE_PAGE = `
+  mutation UpdatePage($id: ID!, $input: PageInput!) {
+    updatePage(id: $id, input: $input) { ${PAGE_FIELDS} }
+  }
+`;
+
+export const DELETE_PAGE = `
+  mutation DeletePage($id: ID!) {
+    deletePage(id: $id)
+  }
+`;
+
 export const ADMIN_CATALOG_QUERY = `
   query AdminCatalog {
     categoryTypes { id name }
@@ -101,7 +158,9 @@ export const ADMIN_CATALOG_QUERY = `
         id name image isEnable categoryId
         menus {
           id name description image fixedPrice currentPrice lowestPrice highestPrice
-          step pricingEnabled isEnable tags subCategoryId
+          step unitsPerStep demandUnits pricingEnabled isEnable tags subCategoryId
+          variants { id name price }
+          addons { id name price }
         }
       }
     }
@@ -154,7 +213,9 @@ export const STORE_MENU = `
   mutation StoreMenu($input: MenuInput!) {
     storeMenu(input: $input) {
       id name description image fixedPrice currentPrice lowestPrice highestPrice
-      step pricingEnabled isEnable tags
+      step unitsPerStep demandUnits pricingEnabled isEnable tags
+      variants { id name price }
+      addons { id name price }
     }
   }
 `;
@@ -163,7 +224,9 @@ export const UPDATE_MENU = `
   mutation UpdateMenu($id: ID!, $input: MenuInput!) {
     updateMenu(id: $id, input: $input) {
       id name description image fixedPrice currentPrice lowestPrice highestPrice
-      step pricingEnabled isEnable tags
+      step unitsPerStep demandUnits pricingEnabled isEnable tags
+      variants { id name price }
+      addons { id name price }
     }
   }
 `;
@@ -174,6 +237,17 @@ export const DELETE_MENU = `
   }
 `;
 
+export const MENU_QUERY = `
+  query Menu($id: ID!) {
+    menu(id: $id) {
+      id name description image fixedPrice currentPrice lowestPrice highestPrice
+      step unitsPerStep demandUnits pricingEnabled isEnable tags subCategoryId
+      variants { id name price }
+      addons { id name price }
+    }
+  }
+`;
+
 export const GET_CART = `
   query GetCart($id: ID!) {
     getCart(id: $id) {
@@ -181,9 +255,9 @@ export const GET_CART = `
       table { id name }
       items {
         id quantity salePrice
-        menu { id name pricingEnabled }
+        menu { id name image pricingEnabled }
         menuVariant { id name }
-        combo { id name }
+        combo { id name image }
         addons { id menuAddon { id name price } }
       }
     }
@@ -215,9 +289,25 @@ export const DELETE_CART_ITEM = `
 `;
 
 export const PLACE_BID = `
-  mutation PlaceBid($menuId: ID!, $amount: Float!, $cartId: ID!, $sessionId: String!) {
-    placeBid(menuId: $menuId, amount: $amount, cartId: $cartId, sessionId: $sessionId) {
-      success failCount message currentPrice
+  mutation PlaceBid(
+    $menuId: ID!
+    $amount: Float!
+    $cartId: ID!
+    $sessionId: String!
+    $quantity: Int
+    $chatAttempt: Int
+    $lastReply: String
+  ) {
+    placeBid(
+      menuId: $menuId
+      amount: $amount
+      cartId: $cartId
+      sessionId: $sessionId
+      quantity: $quantity
+      chatAttempt: $chatAttempt
+      lastReply: $lastReply
+    ) {
+      success failCount offerLivePrice message currentPrice
       cartItem { id }
     }
   }
@@ -229,16 +319,24 @@ export const CHECKOUT = `
     $tableId: ID
     $guestName: String
     $guestEmail: String
+    $note: String
+    $couponCode: String
     $successUrl: String!
     $cancelUrl: String!
+    $redeemPoints: Boolean
+    $redeemStampMenuId: ID
   ) {
     createCheckoutSession(
       cartId: $cartId
       tableId: $tableId
       guestName: $guestName
       guestEmail: $guestEmail
+      note: $note
+      couponCode: $couponCode
       successUrl: $successUrl
       cancelUrl: $cancelUrl
+      redeemPoints: $redeemPoints
+      redeemStampMenuId: $redeemStampMenuId
     ) { url sessionId orderId }
   }
 `;
@@ -252,11 +350,81 @@ export const LIQUOR_MENUS = `
 `;
 
 export const ORDERS_QUERY = `
-  query Orders {
-    orders(limit: 40) {
+  query Orders($userId: ID) {
+    orders(limit: 500, userId: $userId) {
+      id orderNumber status totalAmount guestName guestEmail note createdAt
+      pointsEarned stampsEarned stampRedeemed pointsRedeemed pointsDiscountNzd
+      couponCode couponDiscountNzd
+      coupon { id code percentOff }
+      table { id name }
+      user { id name email }
+      stampMenu { id name }
+      memberStamp {
+        pointsBalance stampsBalance stampsRequired readyCount canApply
+        eligibleItems { id name }
+      }
+      items {
+        id quantity salePrice
+        menu { id name pricingEnabled }
+        menuVariant { id name }
+        combo { id name }
+      }
+    }
+  }
+`;
+
+export const ORDER_QUERY = `
+  query Order($id: ID!) {
+    order(id: $id) {
+      id orderNumber status totalAmount guestName guestEmail note createdAt
+      pointsEarned stampsEarned stampRedeemed pointsRedeemed pointsDiscountNzd
+      couponCode couponDiscountNzd
+      coupon { id code percentOff }
+      table { id name }
+      user { id name email }
+      stampMenu { id name }
+      memberStamp {
+        pointsBalance stampsBalance stampsRequired readyCount canApply
+        eligibleItems { id name }
+      }
+      items {
+        id quantity salePrice
+        menu { id name pricingEnabled }
+        menuVariant { id name }
+        combo { id name }
+      }
+    }
+  }
+`;
+
+export const MY_ORDERS_QUERY = `
+  query MyOrders {
+    myOrders(limit: 50) {
+      id orderNumber status totalAmount guestName guestEmail note createdAt
+      pointsRedeemed pointsDiscountNzd stampRedeemed pointsEarned stampsEarned
+      couponCode couponDiscountNzd
+      coupon { id code percentOff }
+      table { id name }
+      stampMenu { id name }
+      items {
+        id quantity salePrice
+        menu { id name pricingEnabled }
+        menuVariant { id name }
+        combo { id name }
+      }
+    }
+  }
+`;
+
+export const DASHBOARD_ORDERS_QUERY = `
+  query DashboardOrders {
+    orders(limit: 200) {
       id orderNumber status totalAmount guestName createdAt
       table { id name }
-      items { id quantity salePrice menu { id name } }
+      items {
+        id quantity salePrice
+        menu { id name pricingEnabled }
+      }
     }
   }
 `;
@@ -275,6 +443,12 @@ export const STORE_TABLE = `
   }
 `;
 
+export const UPDATE_TABLE = `
+  mutation UpdateTable($id: ID!, $input: TableInput!) {
+    updateTable(id: $id, input: $input) { id name isActive }
+  }
+`;
+
 export const DELETE_TABLE = `
   mutation DeleteTable($id: ID!) {
     deleteTable(id: $id)
@@ -287,8 +461,157 @@ export const UPDATE_ORDER_STATUS = `
   }
 `;
 
+export const ADMIN_APPLY_STAMP = `
+  mutation AdminApplyStamp($orderId: ID!, $menuId: ID) {
+    adminApplyStamp(orderId: $orderId, menuId: $menuId) {
+      id stampRedeemed stampsEarned
+      stampMenu { id name }
+      memberStamp {
+        pointsBalance stampsBalance stampsRequired readyCount canApply
+        eligibleItems { id name }
+      }
+    }
+  }
+`;
+
 export const UPDATE_SITE = `
   mutation UpdateSite($input: SiteInput!) {
     updateSite(input: $input) { id name email logo banners }
   }
 `;
+
+export const UPSERT_ME = `
+  mutation UpsertMe($clerkId: String!, $email: String, $name: String) {
+    upsertMe(clerkId: $clerkId, email: $email, name: $name) {
+      id clerkId email name role
+    }
+  }
+`;
+
+const REWARD_SETTINGS_FIELDS = `
+  id enabled pointsPerDollar pointsToRedeem rewardAmountNzd redeemOn
+  stampsEnabled stampsRequired
+  stampMenus { id menu { id name image } }
+`;
+
+export const REWARD_SETTINGS_QUERY = `
+  query RewardSettings {
+    rewardSettings { ${REWARD_SETTINGS_FIELDS} }
+  }
+`;
+
+export const MY_REWARDS_QUERY = `
+  query MyRewards($cartId: ID) {
+    myRewards(cartId: $cartId) {
+      pointsBalance stampsBalance
+      settings { ${REWARD_SETTINGS_FIELDS} }
+      preview {
+        qualifyingSubtotal maxDiscountNzd pointsToSpend canRedeemStamp
+        stampDiscountNzd
+        stampMenusInCart { id name }
+      }
+      ledger {
+        id orderId type pointsDelta stampsDelta note createdAt
+      }
+    }
+  }
+`;
+
+export const UPDATE_REWARD_SETTINGS = `
+  mutation UpdateRewardSettings($input: RewardSettingsInput!) {
+    updateRewardSettings(input: $input) { ${REWARD_SETTINGS_FIELDS} }
+  }
+`;
+
+export const ORDER_BY_ID_QUERY = `
+  query OrderById($id: ID!) {
+    order(id: $id) {
+      id orderNumber status totalAmount pointsEarned stampsEarned
+      pointsRedeemed pointsDiscountNzd stampRedeemed
+      stampMenu { id name }
+    }
+  }
+`;
+
+export const ADMIN_USERS_QUERY = `
+  query AdminUsers {
+    adminUsers {
+      id name email role createdAt
+      pointsBalance stampsBalance stampsRequired readyCount orderCount
+    }
+  }
+`;
+
+export const ADMIN_USER_QUERY = `
+  query AdminUser($id: ID!) {
+    adminUser(id: $id) {
+      id name email role createdAt
+      pointsBalance stampsBalance stampsRequired readyCount orderCount
+      ledger {
+        id orderId type pointsDelta stampsDelta note createdAt
+      }
+    }
+  }
+`;
+
+export const TABLE_REVENUE_QUERY = `
+  query TableRevenue($days: Int) {
+    tableRevenue(days: $days) {
+      tableId tableName orderCount revenue
+    }
+  }
+`;
+
+export const COUPONS_QUERY = `
+  query Coupons {
+    coupons {
+      id code percentOff minSpendNzd maxDiscountNzd
+      startsAt expiresAt allowWithRewards applyOn isActive createdAt
+    }
+  }
+`;
+
+export const STORE_COUPON = `
+  mutation StoreCoupon($input: CouponInput!) {
+    storeCoupon(input: $input) {
+      id code percentOff minSpendNzd maxDiscountNzd
+      startsAt expiresAt allowWithRewards applyOn isActive
+    }
+  }
+`;
+
+export const UPDATE_COUPON = `
+  mutation UpdateCoupon($id: ID!, $input: CouponInput!) {
+    updateCoupon(id: $id, input: $input) {
+      id code percentOff minSpendNzd maxDiscountNzd
+      startsAt expiresAt allowWithRewards applyOn isActive
+    }
+  }
+`;
+
+export const DELETE_COUPON = `
+  mutation DeleteCoupon($id: ID!) {
+    deleteCoupon(id: $id)
+  }
+`;
+
+export const PREVIEW_COUPON = `
+  query PreviewCoupon(
+    $code: String!
+    $cartId: ID!
+    $redeemPoints: Boolean
+    $redeemStampMenuId: ID
+  ) {
+    previewCoupon(
+      code: $code
+      cartId: $cartId
+      redeemPoints: $redeemPoints
+      redeemStampMenuId: $redeemStampMenuId
+    ) {
+      valid message code percentOff discountNzd
+      minSpendNzd maxDiscountNzd allowWithRewards
+      applyOn qualifyingSubtotal
+    }
+  }
+`;
+

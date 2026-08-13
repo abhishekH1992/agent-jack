@@ -1,6 +1,12 @@
 import Link from "next/link";
+import { SuccessRewards } from "@/components/checkout/SuccessRewards";
 
-export default function SuccessPage() {
+export default async function SuccessPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ orderId?: string; session_id?: string }>;
+}) {
+  const params = await searchParams;
   return (
     <div className="page-shell flex min-h-[70vh] items-center justify-center py-10">
       <div className="surface-card w-full max-w-md p-6 text-center sm:p-8">
@@ -14,9 +20,10 @@ export default function SuccessPage() {
           Payment confirmed. The kitchen and bar have your table order — sit
           back and enjoy.
         </p>
+        <SuccessRewards orderId={params.orderId} />
         <Link
           href="/"
-          className="mt-6 inline-flex min-h-12 w-full cursor-pointer items-center justify-center rounded-full bg-[var(--cta)] px-6 text-sm font-semibold text-white sm:w-auto"
+          className="mt-6 inline-flex min-h-12 w-full cursor-pointer items-center justify-center rounded-full bg-[var(--brand)] px-6 text-sm font-semibold text-white sm:w-auto"
         >
           Back to menu
         </Link>

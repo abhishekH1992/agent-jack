@@ -1,28 +1,147 @@
-import { ChatRole } from "@prisma/client";
 import { GraphQLScalarType, Kind } from "graphql";
 import { prisma } from "../prisma.js";
-import { GraphQLContext, requireAdmin } from "../context.js";
+import { GraphQLContext, requireAdmin, requireUser } from "../context.js";
 import { generateBidChatReply } from "../services/openai.js";
-import { adminForcePrice, bumpPriceOnBid } from "../services/pricing.js";
+import { adminForcePrice } from "../services/pricing.js";
 import { createCheckoutSession } from "../services/stripe.js";
+import { previewCouponQuote } from "../services/checkout-quote.js";
+import {
+  couponWriteData,
+  mapCoupon,
+} from "../services/coupons.js";
+import {
+  adminApplyStamp,
+  getMyRewards,
+  getRewardSettings,
+  getStampCtx,
+  mapRewardSettings,
+  memberStampForOrder,
+  orderAdminInclude,
+  restoreRedemption,
+  rewardSettingsInclude,
+} from "../services/rewards.js";
+import { RewardRedeemOn } from "@prisma/client";
 import {
   beltInclude,
   cartInclude,
-  dec,
   mapBelt,
   mapMenu,
+  mapPage,
   menuInclude,
+  menuWriteData,
+  pageInclude,
   persistBelt,
+  persistPage,
   resolveBeltMenus,
+  syncMenuOptions,
 } from "./helpers.js";
+
+function parseDateTimeValue(value: unknown): Date | null {
+  if (value == null || value === "") return null;
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) throw new Error("Invalid date");
+    return value;
+  }
+  const raw = String(value).trim();
+  if (!raw) return null;
+  const local = raw.match(
+    /^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2})(?::(\d{2})(?:\.(\d+))?)?)?$/,
+  );
+  if (local) {
+    const date = new Date(
+      Number(local[1]),
+      Number(local[2]) - 1,
+      Number(local[3]),
+      Number(local[4] || 0),
+      Number(local[5] || 0),
+      Number(local[6] || 0),
+      local[7] ? Number(String(local[7]).padEnd(3, "0").slice(0, 3)) : 0,
+    );
+    if (Number.isNaN(date.getTime())) throw new Error("Invalid date");
+    return date;
+  }
+  const date = new Date(raw);
+  if (Number.isNaN(date.getTime())) throw new Error("Invalid date");
+  return date;
+}
 
 const DateTime = new GraphQLScalarType({
   name: "DateTime",
   serialize: (v) => (v instanceof Date ? v.toISOString() : v),
-  parseValue: (v) => new Date(v as string),
+  parseValue: parseDateTimeValue,
   parseLiteral: (ast) =>
-    ast.kind === Kind.STRING ? new Date(ast.value) : null,
+    ast.kind === Kind.STRING ? parseDateTimeValue(ast.value) : null,
 });
+
+function mapOrder(o: any, stampCtx?: Awaited<ReturnType<typeof getStampCtx>>) {
+  return {
+    ...o,
+    totalAmount: Number(o.totalAmount),
+    pointsRedeemed: Number(o.pointsRedeemed || 0),
+    pointsDiscountNzd: Number(o.pointsDiscountNzd || 0),
+    coupon: o.coupon ? mapCoupon(o.coupon) : null,
+    couponCode: o.couponCode || o.coupon?.code || null,
+    couponDiscountNzd: Number(o.couponDiscountNzd || 0),
+    stampRedeemed: Boolean(o.stampRedeemed),
+    pointsEarned: Number(o.pointsEarned || 0),
+    stampsEarned: Number(o.stampsEarned || 0),
+    stampMenu: o.stampMenu ? mapMenu(o.stampMenu) : null,
+    user: o.user
+      ? {
+          id: o.user.id,
+          clerkId: o.user.clerkId,
+          email: o.user.email,
+          name: o.user.name,
+          role: o.user.role,
+        }
+      : null,
+    memberStamp: stampCtx ? memberStampForOrder(o, stampCtx) : null,
+    items: o.items.map((i: any) => ({
+      ...i,
+      salePrice: Number(i.salePrice),
+      menu: i.menu ? mapMenu(i.menu) : null,
+    })),
+  };
+}
+
+function mapAdminUser(
+  user: {
+    id: string;
+    name: string | null;
+    email: string | null;
+    role: string;
+    createdAt: Date;
+    reward?: { pointsBalance: number; stampsBalance: number } | null;
+    ledger?: {
+      id: string;
+      orderId: string | null;
+      type: string;
+      pointsDelta: number;
+      stampsDelta: number;
+      note: string | null;
+      createdAt: Date;
+    }[];
+    _count?: { orders: number };
+  },
+  stampsRequired: number,
+) {
+  const pointsBalance = user.reward?.pointsBalance ?? 0;
+  const stampsBalance = user.reward?.stampsBalance ?? 0;
+  const required = Math.max(1, stampsRequired);
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    createdAt: user.createdAt,
+    pointsBalance,
+    stampsBalance,
+    stampsRequired: required,
+    readyCount: Math.floor(stampsBalance / required),
+    orderCount: user._count?.orders ?? 0,
+    ledger: user.ledger || [],
+  };
+}
 
 function mapCart(cart: any) {
   return {
@@ -70,17 +189,32 @@ export const resolvers = {
           },
         },
       }),
-    categories: (_: unknown, { isEnable }: { isEnable?: boolean }) =>
-      prisma.category.findMany({
+    categories: async (_: unknown, { isEnable }: { isEnable?: boolean }) => {
+      const cats = await prisma.category.findMany({
         where: isEnable == null ? undefined : { isEnable },
         include: {
           categoryType: true,
           subCategories: {
-            include: { menus: { include: menuInclude } },
+            where: isEnable == null ? undefined : { isEnable: true },
+            include: {
+              menus: {
+                where: isEnable == null ? undefined : { isEnable: true },
+                include: menuInclude,
+              },
+            },
+            orderBy: { name: "asc" },
           },
         },
         orderBy: { name: "asc" },
-      }),
+      });
+      return cats.map((cat) => ({
+        ...cat,
+        subCategories: cat.subCategories.map((s) => ({
+          ...s,
+          menus: s.menus.map(mapMenu),
+        })),
+      }));
+    },
     categoryBySlug: async (_: unknown, { slug }: { slug: string }) => {
       const cat = await prisma.category.findUnique({
         where: { slug },
@@ -150,6 +284,29 @@ export const resolvers = {
         }),
       );
     },
+    pages: async (_: unknown, { isEnable }: { isEnable?: boolean }) => {
+      const pages = await prisma.page.findMany({
+        where: isEnable == null ? undefined : { isEnable },
+        orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+        include: pageInclude,
+      });
+      return Promise.all(pages.map((page) => mapPage(page)));
+    },
+    page: async (_: unknown, { id }: { id: string }) => {
+      const page = await prisma.page.findUnique({
+        where: { id },
+        include: pageInclude,
+      });
+      return page ? mapPage(page) : null;
+    },
+    pageBySlug: async (_: unknown, { slug }: { slug: string }) => {
+      const page = await prisma.page.findUnique({
+        where: { slug },
+        include: pageInclude,
+      });
+      if (!page || !page.isEnable) return null;
+      return mapPage(page);
+    },
     getCart: async (_: unknown, { id }: { id: string }) => {
       const cart = await prisma.cart.findUnique({
         where: { id },
@@ -157,48 +314,166 @@ export const resolvers = {
       });
       return cart ? mapCart(cart) : null;
     },
-    orders: async (_: unknown, { limit }: { limit?: number }, ctx: GraphQLContext) => {
+    orders: async (
+      _: unknown,
+      { limit, userId }: { limit?: number; userId?: string | null },
+      ctx: GraphQLContext,
+    ) => {
       requireAdmin(ctx);
+      const stampCtx = await getStampCtx();
       const orders = await prisma.order.findMany({
+        where: userId ? { userId } : undefined,
+        take: limit || 500,
+        orderBy: { createdAt: "desc" },
+        include: orderAdminInclude,
+      });
+      return orders.map((o) => mapOrder(o, stampCtx));
+    },
+    myOrders: async (
+      _: unknown,
+      { limit }: { limit?: number },
+      ctx: GraphQLContext,
+    ) => {
+      const user = requireUser(ctx);
+      const email = user.email?.trim().toLowerCase() || null;
+      const orders = await prisma.order.findMany({
+        where: {
+          OR: [
+            { userId: user.id },
+            ...(email
+              ? [{ guestEmail: { equals: email, mode: "insensitive" as const } }]
+              : []),
+          ],
+        },
         take: limit || 50,
         orderBy: { createdAt: "desc" },
         include: {
           table: true,
+          stampMenu: true,
+          coupon: true,
           items: {
             include: { menu: true, menuVariant: true, combo: true },
           },
         },
       });
-      return orders.map((o) => ({
-        ...o,
-        totalAmount: Number(o.totalAmount),
-        items: o.items.map((i) => ({
-          ...i,
-          salePrice: Number(i.salePrice),
-          menu: i.menu ? mapMenu(i.menu) : null,
-        })),
-      }));
+      return orders.map((o) => mapOrder(o));
     },
     order: async (_: unknown, { id }: { id: string }) => {
+      const stampCtx = await getStampCtx();
       const o = await prisma.order.findUnique({
         where: { id },
-        include: {
-          table: true,
-          items: { include: { menu: true, menuVariant: true, combo: true } },
-        },
+        include: orderAdminInclude,
       });
       if (!o) return null;
-      return {
-        ...o,
-        totalAmount: Number(o.totalAmount),
-        items: o.items.map((i) => ({
-          ...i,
-          salePrice: Number(i.salePrice),
-          menu: i.menu ? mapMenu(i.menu) : null,
-        })),
-      };
+      return mapOrder(o, stampCtx);
     },
     me: (_: unknown, __: unknown, ctx: GraphQLContext) => ctx.user,
+    rewardSettings: async () => mapRewardSettings(await getRewardSettings()),
+    myRewards: async (
+      _: unknown,
+      { cartId }: { cartId?: string | null },
+      ctx: GraphQLContext,
+    ) => {
+      const user = requireUser(ctx);
+      return getMyRewards(user.id, cartId);
+    },
+    adminUsers: async (_: unknown, __: unknown, ctx: GraphQLContext) => {
+      requireAdmin(ctx);
+      const settings = await getRewardSettings();
+      const users = await prisma.user.findMany({
+        orderBy: { createdAt: "desc" },
+        include: {
+          reward: true,
+          _count: { select: { orders: true } },
+        },
+      });
+      return users.map((u) => mapAdminUser(u, settings.stampsRequired));
+    },
+    adminUser: async (
+      _: unknown,
+      { id }: { id: string },
+      ctx: GraphQLContext,
+    ) => {
+      requireAdmin(ctx);
+      const settings = await getRewardSettings();
+      const user = await prisma.user.findUnique({
+        where: { id },
+        include: {
+          reward: true,
+          _count: { select: { orders: true } },
+          ledger: { orderBy: { createdAt: "desc" }, take: 100 },
+        },
+      });
+      if (!user) return null;
+      return mapAdminUser(user, settings.stampsRequired);
+    },
+    coupons: async (_: unknown, __: unknown, ctx: GraphQLContext) => {
+      requireAdmin(ctx);
+      const rows = await prisma.coupon.findMany({
+        orderBy: { createdAt: "desc" },
+      });
+      return rows.map(mapCoupon);
+    },
+    coupon: async (_: unknown, { id }: { id: string }, ctx: GraphQLContext) => {
+      requireAdmin(ctx);
+      const row = await prisma.coupon.findUnique({ where: { id } });
+      return row ? mapCoupon(row) : null;
+    },
+    previewCoupon: async (
+      _: unknown,
+      args: {
+        code: string;
+        cartId: string;
+        redeemPoints?: boolean | null;
+        redeemStampMenuId?: string | null;
+      },
+      ctx: GraphQLContext,
+    ) => {
+      return previewCouponQuote({
+        cartId: args.cartId,
+        couponCode: args.code,
+        redeemPoints: args.redeemPoints,
+        redeemStampMenuId: args.redeemStampMenuId,
+        userId: ctx.user?.id,
+      });
+    },
+    tableRevenue: async (
+      _: unknown,
+      { days }: { days?: number | null },
+      ctx: GraphQLContext,
+    ) => {
+      requireAdmin(ctx);
+      const since =
+        days && days > 0
+          ? new Date(Date.now() - days * 24 * 60 * 60 * 1000)
+          : null;
+      const grouped = await prisma.order.groupBy({
+        by: ["tableId"],
+        where: {
+          status: { in: ["PAID", "FULFILLED"] },
+          tableId: { not: null },
+          ...(since ? { createdAt: { gte: since } } : {}),
+        },
+        _sum: { totalAmount: true },
+        _count: { _all: true },
+      });
+      const tableIds = grouped
+        .map((row) => row.tableId)
+        .filter((id): id is string => Boolean(id));
+      const tables = tableIds.length
+        ? await prisma.table.findMany({ where: { id: { in: tableIds } } })
+        : [];
+      const names = new Map(tables.map((t) => [t.id, t.name]));
+      return grouped
+        .filter((row) => row.tableId)
+        .map((row) => ({
+          tableId: row.tableId as string,
+          tableName: names.get(row.tableId as string) || "Table",
+          orderCount: row._count._all,
+          revenue: Number(row._sum.totalAmount || 0),
+        }))
+        .sort((a, b) => b.revenue - a.revenue);
+    },
   },
 
   Mutation: {
@@ -277,13 +552,25 @@ export const resolvers = {
         amount,
         cartId,
         sessionId,
-      }: { menuId: string; amount: number; cartId: string; sessionId: string },
+        chatAttempt,
+        lastReply,
+        quantity,
+      }: {
+        menuId: string;
+        amount: number;
+        cartId: string;
+        sessionId: string;
+        chatAttempt?: number | null;
+        lastReply?: string | null;
+        quantity?: number | null;
+      },
       ctx: GraphQLContext,
     ) => {
       const rounded = Math.round(Number(amount) * 100) / 100;
       if (!Number.isFinite(rounded) || rounded < 0) {
         throw new Error("Invalid bid amount");
       }
+      const qty = Math.min(99, Math.max(1, Math.floor(Number(quantity) || 1)));
       const menu = await prisma.menu.findUniqueOrThrow({
         where: { id: menuId },
         include: menuInclude,
@@ -317,24 +604,17 @@ export const resolvers = {
       });
 
       const failCount = success ? 0 : recentFails + 1;
-
-      await prisma.chatMessage.create({
-        data: {
-          menuId,
-          sessionId,
-          userId: ctx.user?.id,
-          role: ChatRole.USER,
-          content: rounded.toFixed(2),
-        },
-      });
+      // Client owns the 3-miss offer UI; this flag is informational only
+      const offerLivePrice = !success && Number(chatAttempt || 0) >= 3;
 
       let cartItem = null;
       if (success) {
+        // Price stays put until paid; then units accumulate toward unitsPerStep
         cartItem = await prisma.cartItem.create({
           data: {
             cartId,
             menuId,
-            quantity: 1,
+            quantity: qty,
             salePrice: rounded,
           },
           include: {
@@ -344,35 +624,25 @@ export const resolvers = {
             addons: { include: { menuAddon: true } },
           },
         });
-        await bumpPriceOnBid(menuId);
       }
 
-      const refreshed = await prisma.menu.findUniqueOrThrow({ where: { id: menuId } });
+      const refreshed = await prisma.menu.findUniqueOrThrow({
+        where: { id: menuId },
+      });
       const currentPrice = Number(refreshed.currentPrice ?? refreshed.fixedPrice);
 
       const message = await generateBidChatReply({
         menuName: menu.name,
-        currentPrice: success ? current : currentPrice,
-        lowestPrice: Number(menu.lowestPrice ?? menu.fixedPrice),
-        highestPrice: max,
         bidAmount: rounded,
         success,
-        failCount,
-      });
-
-      await prisma.chatMessage.create({
-        data: {
-          menuId,
-          sessionId,
-          userId: ctx.user?.id,
-          role: ChatRole.ASSISTANT,
-          content: message,
-        },
+        chatAttempt: Number(chatAttempt || failCount || 1),
+        lastReply: lastReply || null,
       });
 
       return {
         success,
         failCount,
+        offerLivePrice,
         message,
         currentPrice,
         cartItem: cartItem
@@ -392,8 +662,12 @@ export const resolvers = {
         tableId?: string;
         guestName?: string;
         guestEmail?: string;
+        note?: string | null;
+        couponCode?: string | null;
         successUrl: string;
         cancelUrl: string;
+        redeemPoints?: boolean | null;
+        redeemStampMenuId?: string | null;
       },
       ctx: GraphQLContext,
     ) => {
@@ -406,18 +680,30 @@ export const resolvers = {
       _: unknown,
       args: { clerkId: string; email?: string; name?: string; role?: string },
     ) => {
+      const email = args.email?.trim() || null;
+      const name = args.name?.trim() || null;
+      const existing = await prisma.user.findUnique({
+        where: { clerkId: args.clerkId },
+      });
+      // Never trust client-provided role elevation; only seed admin email is promoted.
+      const role =
+        existing?.role === "admin" ||
+        email?.toLowerCase() === "admin@example.com"
+          ? "admin"
+          : "customer";
+
       return prisma.user.upsert({
         where: { clerkId: args.clerkId },
         update: {
-          email: args.email,
-          name: args.name,
-          role: args.role,
+          ...(email ? { email } : {}),
+          ...(name ? { name } : {}),
+          role,
         },
         create: {
           clerkId: args.clerkId,
-          email: args.email,
-          name: args.name,
-          role: args.role || "customer",
+          email: email || undefined,
+          name: name || undefined,
+          role,
         },
       });
     },
@@ -545,13 +831,17 @@ export const resolvers = {
     storeMenu: async (_: unknown, { input }: { input: any }, ctx: GraphQLContext) => {
       requireAdmin(ctx);
       const menu = await prisma.menu.create({
-        data: {
-          ...input,
-          currentPrice: input.currentPrice ?? input.fixedPrice,
-        },
+        data: menuWriteData(input),
         include: menuInclude,
       });
-      return mapMenu(menu);
+      if (input.variants != null || input.addons != null) {
+        await syncMenuOptions(menu.id, input);
+      }
+      const full = await prisma.menu.findUniqueOrThrow({
+        where: { id: menu.id },
+        include: menuInclude,
+      });
+      return mapMenu(full);
     },
     updateMenu: async (
       _: unknown,
@@ -559,9 +849,15 @@ export const resolvers = {
       ctx: GraphQLContext,
     ) => {
       requireAdmin(ctx);
-      const menu = await prisma.menu.update({
+      await prisma.menu.update({
         where: { id },
-        data: input,
+        data: menuWriteData(input),
+      });
+      if (input.variants != null || input.addons != null) {
+        await syncMenuOptions(id, input);
+      }
+      const menu = await prisma.menu.findUniqueOrThrow({
+        where: { id },
         include: menuInclude,
       });
       return mapMenu(menu);
@@ -639,6 +935,23 @@ export const resolvers = {
       await prisma.belt.delete({ where: { id } });
       return true;
     },
+    storePage: async (_: unknown, { input }: { input: any }, ctx: GraphQLContext) => {
+      requireAdmin(ctx);
+      return persistPage(input);
+    },
+    updatePage: async (
+      _: unknown,
+      { id, input }: { id: string; input: any },
+      ctx: GraphQLContext,
+    ) => {
+      requireAdmin(ctx);
+      return persistPage(input, id);
+    },
+    deletePage: async (_: unknown, { id }: { id: string }, ctx: GraphQLContext) => {
+      requireAdmin(ctx);
+      await prisma.page.delete({ where: { id } });
+      return true;
+    },
     adminForcePrice: async (
       _: unknown,
       { menuId, action }: { menuId: string; action: string },
@@ -686,29 +999,141 @@ export const resolvers = {
         },
       });
     },
+    updateRewardSettings: async (
+      _: unknown,
+      { input }: { input: any },
+      ctx: GraphQLContext,
+    ) => {
+      requireAdmin(ctx);
+      const existing = await getRewardSettings();
+      const pointsPerDollar = Number(input.pointsPerDollar ?? existing.pointsPerDollar);
+      const pointsToRedeem = Math.floor(
+        Number(input.pointsToRedeem ?? existing.pointsToRedeem),
+      );
+      const rewardAmountNzd = Number(
+        input.rewardAmountNzd ?? existing.rewardAmountNzd,
+      );
+      const stampsRequired = Math.floor(
+        Number(input.stampsRequired ?? existing.stampsRequired),
+      );
+      if (!Number.isFinite(pointsPerDollar) || pointsPerDollar < 0) {
+        throw new Error("Points per dollar must be 0 or more");
+      }
+      if (!Number.isFinite(pointsToRedeem) || pointsToRedeem < 1) {
+        throw new Error("Points to redeem must be at least 1");
+      }
+      if (!Number.isFinite(rewardAmountNzd) || rewardAmountNzd < 0) {
+        throw new Error("Reward amount must be 0 or more");
+      }
+      if (!Number.isFinite(stampsRequired) || stampsRequired < 1) {
+        throw new Error("Stamps required must be at least 1");
+      }
+      const redeemOn = (input.redeemOn || existing.redeemOn) as RewardRedeemOn;
+      if (!["FOOD", "LIQUOR", "BOTH"].includes(redeemOn)) {
+        throw new Error("Redeem on must be Food, Liquor, or Both");
+      }
+
+      await prisma.rewardSettings.update({
+        where: { id: existing.id },
+        data: {
+          enabled: input.enabled ?? existing.enabled,
+          pointsPerDollar,
+          pointsToRedeem,
+          rewardAmountNzd,
+          redeemOn,
+          stampsEnabled: input.stampsEnabled ?? existing.stampsEnabled,
+          stampsRequired,
+        },
+      });
+
+      if (input.stampMenuIds != null) {
+        const ids = (input.stampMenuIds as string[]).filter(Boolean);
+        await prisma.rewardStampMenu.deleteMany({
+          where: { rewardSettingsId: existing.id },
+        });
+        if (ids.length) {
+          await prisma.rewardStampMenu.createMany({
+            data: ids.map((menuId) => ({
+              rewardSettingsId: existing.id,
+              menuId,
+            })),
+          });
+        }
+      }
+
+      const updated = await prisma.rewardSettings.findUniqueOrThrow({
+        where: { id: existing.id },
+        include: rewardSettingsInclude,
+      });
+      return mapRewardSettings(updated);
+    },
+    storeCoupon: async (
+      _: unknown,
+      { input }: { input: any },
+      ctx: GraphQLContext,
+    ) => {
+      requireAdmin(ctx);
+      try {
+        return mapCoupon(
+          await prisma.coupon.create({ data: couponWriteData(input) }),
+        );
+      } catch (err: any) {
+        if (err?.code === "P2002") throw new Error("That coupon code already exists");
+        throw err;
+      }
+    },
+    updateCoupon: async (
+      _: unknown,
+      { id, input }: { id: string; input: any },
+      ctx: GraphQLContext,
+    ) => {
+      requireAdmin(ctx);
+      try {
+        return mapCoupon(
+          await prisma.coupon.update({
+            where: { id },
+            data: couponWriteData(input),
+          }),
+        );
+      } catch (err: any) {
+        if (err?.code === "P2002") throw new Error("That coupon code already exists");
+        throw err;
+      }
+    },
+    deleteCoupon: async (
+      _: unknown,
+      { id }: { id: string },
+      ctx: GraphQLContext,
+    ) => {
+      requireAdmin(ctx);
+      await prisma.coupon.delete({ where: { id } });
+      return true;
+    },
     updateOrderStatus: async (
       _: unknown,
       { id, status }: { id: string; status: string },
       ctx: GraphQLContext,
     ) => {
       requireAdmin(ctx);
+      const current = await prisma.order.findUnique({ where: { id } });
+      if (status === "CANCELLED" && current?.status === "PENDING") {
+        await restoreRedemption(id);
+      }
       const o = await prisma.order.update({
         where: { id },
         data: { status: status as any },
-        include: {
-          table: true,
-          items: { include: { menu: true, menuVariant: true, combo: true } },
-        },
+        include: orderAdminInclude,
       });
-      return {
-        ...o,
-        totalAmount: Number(o.totalAmount),
-        items: o.items.map((i) => ({
-          ...i,
-          salePrice: Number(i.salePrice),
-          menu: i.menu ? mapMenu(i.menu) : null,
-        })),
-      };
+      return mapOrder(o, await getStampCtx());
+    },
+    adminApplyStamp: async (
+      _: unknown,
+      { orderId, menuId }: { orderId: string; menuId?: string | null },
+      ctx: GraphQLContext,
+    ) => {
+      requireAdmin(ctx);
+      const order = await adminApplyStamp(orderId, menuId);
+      return mapOrder(order, await getStampCtx());
     },
   },
 

@@ -23,7 +23,7 @@ export function StickyCartBar() {
           </div>
         </div>
         <Link href="/cart" className="shrink-0 cursor-pointer">
-          <Button className="min-h-12 bg-[var(--cta)] px-6 font-semibold text-white">
+          <Button className="min-h-12 bg-[var(--brand)] px-6 font-semibold text-white">
             View cart
           </Button>
         </Link>

@@ -11,7 +11,11 @@ import { typeDefs } from "./typeDefs/index.js";
 import { resolvers } from "./resolvers/index.js";
 import { buildContext } from "./context.js";
 import { setPriceEmitter, startCooldownJob } from "./services/pricing.js";
-import { getStripe, handleCheckoutCompleted } from "./services/stripe.js";
+import {
+  getStripe,
+  handleCheckoutCompleted,
+  handleCheckoutExpired,
+} from "./services/stripe.js";
 
 const PORT = Number(process.env.PORT || 4000);
 const CLIENT_URL = process.env.CLIENT_URL || "http://localhost:3000";
@@ -50,6 +54,9 @@ async function main() {
         if (event.type === "checkout.session.completed") {
           await handleCheckoutCompleted(event.data.object as Stripe.Checkout.Session);
         }
+        if (event.type === "checkout.session.expired") {
+          await handleCheckoutExpired(event.data.object as Stripe.Checkout.Session);
+        }
         res.json({ received: true });
       } catch (err: any) {
         console.error("Stripe webhook error", err.message);
@@ -65,7 +72,7 @@ async function main() {
     "/graphql",
     cors({ origin: CLIENT_URL, credentials: true }),
     cookieParser(),
-    express.json(),
+    express.json({ type: "*/*" }),
     expressMiddleware(apollo, {
       context: async ({ req }) => buildContext({ req }),
     }),

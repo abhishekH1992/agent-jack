@@ -1,20 +1,41 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
+import Link from "next/link";
 import toast from "react-hot-toast";
 import { adminGql } from "@/lib/admin";
-import { uploadAdminFiles } from "@/lib/admin-upload";
 import { SITE_QUERY, UPDATE_SITE } from "@/lib/queries";
 import { ImageUploadField } from "@/components/admin/ImageUploadField";
+import { IMAGE_SIZE_HINTS } from "@/lib/image-sizes";
+
+const SETTING_SECTIONS = [
+  {
+    href: "/admin/settings/tables",
+    title: "Tables",
+    body: "Add, edit, or delete tables and print QR codes for each one.",
+  },
+  {
+    href: "/admin/settings/rewards",
+    title: "Rewards",
+    body: "Points, stamp cards, and what members can redeem.",
+  },
+  {
+    href: "/admin/settings/coupons",
+    title: "Coupons",
+    body: "Promo codes, dates, min spend, and food or liquor limits.",
+  },
+  {
+    href: "/admin/settings/profile",
+    title: "Profile",
+    body: "Your admin account and sign-in details.",
+  },
+];
 
 export default function AdminSettingsPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [logo, setLogo] = useState("");
-  const [banners, setBanners] = useState<string[]>([]);
-  const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     adminGql<{ site: any }>(SITE_QUERY)
@@ -22,47 +43,15 @@ export default function AdminSettingsPage() {
         setName(data.site?.name || "");
         setEmail(data.site?.email || "");
         setLogo(data.site?.logo || "");
-        setBanners(data.site?.banners || []);
       })
       .catch(console.error);
   }, []);
-
-  async function onPickFiles(files: FileList | null) {
-    if (!files?.length) return;
-    setUploading(true);
-    try {
-      const urls = await uploadAdminFiles(files, "banners");
-      setBanners((prev) => [...prev, ...urls]);
-      toast.success(
-        urls.length === 1 ? "Image uploaded" : `${urls.length} images uploaded`,
-      );
-    } catch (err: any) {
-      toast.error(err.message || "Upload failed");
-    } finally {
-      setUploading(false);
-      if (fileRef.current) fileRef.current.value = "";
-    }
-  }
-
-  function removeBanner(index: number) {
-    setBanners((prev) => prev.filter((_, i) => i !== index));
-  }
-
-  function moveBanner(index: number, dir: -1 | 1) {
-    setBanners((prev) => {
-      const next = [...prev];
-      const target = index + dir;
-      if (target < 0 || target >= next.length) return prev;
-      [next[index], next[target]] = [next[target], next[index]];
-      return next;
-    });
-  }
 
   async function save() {
     setSaving(true);
     try {
       await adminGql(UPDATE_SITE, {
-        input: { name, email, logo, banners },
+        input: { name, email, logo },
       });
       toast.success("Saved");
     } catch (err: any) {
@@ -73,16 +62,17 @@ export default function AdminSettingsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-xl space-y-6">
+    <div className="space-y-6">
       <div>
         <h1
           className="text-3xl md:text-4xl"
           style={{ fontFamily: "var(--font-display), serif" }}
         >
-          Settings
+          Site Settings
         </h1>
         <p className="text-sm text-[var(--muted)]">
-          Restaurant profile. Stripe secrets stay in environment variables.
+          Restaurant name, contact, and logo. Stripe secrets stay in environment
+          variables.
         </p>
       </div>
 
@@ -103,99 +93,32 @@ export default function AdminSettingsPage() {
           label="Logo"
           value={logo}
           onChange={setLogo}
+          hint={IMAGE_SIZE_HINTS.logo}
         />
-
-        <div className="space-y-2">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <span className="text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
-              Home banners
-            </span>
-            <button
-              type="button"
-              className="btn btn-secondary !px-3 !py-2 text-sm"
-              disabled={uploading}
-              onClick={() => fileRef.current?.click()}
-            >
-              {uploading ? "Uploading…" : "Upload images"}
-            </button>
-            <input
-              ref={fileRef}
-              type="file"
-              accept="image/jpeg,image/png,image/webp,image/gif"
-              multiple
-              className="hidden"
-              onChange={(e) => onPickFiles(e.target.files)}
-            />
-          </div>
-
-          {banners.length === 0 ? (
-            <p className="rounded-xl border border-dashed border-[var(--line)] px-3 py-6 text-center text-sm text-[var(--muted)]">
-              No banners yet. Upload one or more images — leave empty to keep
-              the text hero.
-            </p>
-          ) : (
-            <ul className="space-y-2">
-              {banners.map((url, index) => (
-                <li
-                  key={`${url}-${index}`}
-                  className="flex items-center gap-3 rounded-xl border border-[var(--line)] bg-white p-2"
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={url}
-                    alt=""
-                    className="h-16 w-24 shrink-0 rounded-lg object-cover"
-                  />
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-xs text-[var(--muted)]">
-                      {url}
-                    </div>
-                    <div className="mt-1 text-xs font-medium">
-                      Slide {index + 1}
-                    </div>
-                  </div>
-                  <div className="flex shrink-0 flex-col gap-1">
-                    <button
-                      type="button"
-                      className="btn btn-secondary !min-h-9 !px-2 !py-1 text-xs"
-                      disabled={index === 0}
-                      onClick={() => moveBanner(index, -1)}
-                    >
-                      Up
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-secondary !min-h-9 !px-2 !py-1 text-xs"
-                      disabled={index === banners.length - 1}
-                      onClick={() => moveBanner(index, 1)}
-                    >
-                      Down
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-danger !min-h-9 !px-2 !py-1 text-xs"
-                      onClick={() => removeBanner(index)}
-                    >
-                      Remove
-                    </button>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-          <p className="text-xs text-[var(--muted)]">
-            JPG, PNG, WebP or GIF · up to 8MB each · multiple files supported.
-            Save settings after uploading.
-          </p>
-        </div>
 
         <button
           className="btn btn-primary w-full"
-          disabled={saving || uploading}
+          disabled={saving}
           onClick={save}
         >
           {saving ? "Saving…" : "Save settings"}
         </button>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        {SETTING_SECTIONS.map((item) => (
+          <Link
+            key={item.href}
+            href={item.href}
+            className="surface-card block rounded-2xl p-5 no-underline transition hover:border-[var(--brand)]"
+          >
+            <div className="font-semibold text-[var(--ink)]">{item.title}</div>
+            <p className="mt-1 text-sm text-[var(--muted)]">{item.body}</p>
+            <span className="mt-3 inline-block text-xs font-semibold text-[var(--cta)]">
+              Open →
+            </span>
+          </Link>
+        ))}
       </div>
 
       <div className="surface-card rounded-2xl p-5 text-sm text-[var(--muted)]">

@@ -2,11 +2,11 @@
 @import "@heroui/styles";
 
 :root {
-  /* UI UX Pro Max — Agent Jack (restaurant / mobile-first) */
+  /* UI UX Pro Max — Restaurant/Food: appetizing orange + warm gold */
   --color-primary: #ea580c;
   --color-on-primary: #ffffff;
   --color-secondary: #f97316;
-  --color-accent: #2563eb;
+  --color-accent: #a16207;
   --color-background: #fff7ed;
   --color-foreground: #0f172a;
   --color-muted-bg: #fdf4f0;
@@ -97,7 +97,7 @@ body {
   color: var(--ink);
   background:
     radial-gradient(120% 80% at 0% 0%, rgba(234, 88, 12, 0.14), transparent 55%),
-    radial-gradient(90% 60% at 100% 0%, rgba(37, 99, 235, 0.08), transparent 50%),
+    radial-gradient(90% 60% at 100% 0%, rgba(161, 98, 7, 0.14), transparent 50%),
     linear-gradient(180deg, #fffaf5 0%, var(--page) 42%, #ffedd5 100%);
   font-family: var(--font-body), "Karla", sans-serif;
   font-size: 16px;
@@ -164,6 +164,103 @@ summary {
   font-family: var(--font-display), "Playfair Display SC", serif;
 }
 
+.prose-page p {
+  margin: 0 0 1rem;
+  line-height: 1.7;
+  color: var(--ink);
+}
+
+.prose-page h1 {
+  margin: 1.5rem 0 0.75rem;
+  font-family: var(--font-display), serif;
+  font-size: 1.75rem;
+}
+
+.prose-page h2 {
+  margin: 1.5rem 0 0.75rem;
+  font-family: var(--font-display), serif;
+  font-size: 1.5rem;
+}
+
+.prose-page h3 {
+  margin: 1.25rem 0 0.5rem;
+  font-size: 1.125rem;
+  font-weight: 700;
+}
+
+.prose-page ul {
+  margin: 0 0 1rem 1.25rem;
+  list-style: disc;
+}
+
+.prose-page ol {
+  margin: 0 0 1rem 1.25rem;
+  list-style: decimal;
+}
+
+.prose-page blockquote {
+  margin: 0 0 1rem;
+  border-left: 3px solid var(--line);
+  padding-left: 0.75rem;
+  color: var(--muted);
+}
+
+.prose-page a {
+  color: var(--cta);
+  text-decoration: underline;
+}
+
+.rich-text-editor {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+
+.rich-text-editor__toolbar {
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  border-bottom: 1px solid var(--line);
+  background: var(--page);
+  padding: 0.5rem;
+}
+
+.rich-text-editor__toolbar-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.rich-text-editor__content {
+  min-height: 12rem;
+}
+
+.rich-text-editor__prosemirror {
+  min-height: 12rem;
+  padding: 0.75rem 1rem;
+  outline: none;
+}
+
+.rich-text-editor__prosemirror p.is-editor-empty:first-child::before {
+  height: 0;
+  float: left;
+  color: var(--muted);
+  content: attr(data-placeholder);
+  pointer-events: none;
+}
+
+.rich-text-editor__footer {
+  border-top: 1px solid var(--line);
+  padding: 0.4rem 0.75rem;
+  text-align: right;
+}
+
+.rich-text-editor__character-count {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
 .btn {
   display: inline-flex;
   align-items: center;
@@ -192,7 +289,7 @@ summary {
 }
 
 .btn-primary {
-  background: var(--cta);
+  background: var(--brand);
   color: #fff;
 }
 
@@ -314,9 +411,44 @@ summary {
   .admin-shell {
     grid-template-columns: 260px 1fr;
   }
+
+  .admin-shell.settings-nav {
+    grid-template-columns: 260px 220px 1fr;
+  }
 }
 
 /* Sticky bottom bars — respect iOS home indicator */
 .safe-bottom {
   padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+}
+
+@media print {
+  body {
+    background: white !important;
+    color: black !important;
+  }
+
+  .admin-shell {
+    display: block;
+    min-height: 0;
+    background: white;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .print-ticket {
+    display: block !important;
+    max-width: 80mm;
+    margin: 0 auto;
+    color: black;
+    font-size: 12px;
+  }
+
+  .print-ticket * {
+    color: black !important;
+    box-shadow: none !important;
+    background: transparent !important;
+  }
 }

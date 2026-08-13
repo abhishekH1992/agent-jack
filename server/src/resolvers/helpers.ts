@@ -9,14 +9,124 @@ export function dec(v: Prisma.Decimal | number | null | undefined): number | nul
 export function mapMenu(menu: any) {
   return {
     ...menu,
+    description: menu.description ?? null,
     fixedPrice: Number(menu.fixedPrice),
     lowestPrice: dec(menu.lowestPrice),
     highestPrice: dec(menu.highestPrice),
     step: dec(menu.step),
     currentPrice: dec(menu.currentPrice),
+    unitsPerStep: Number(menu.unitsPerStep ?? 5),
+    demandUnits: Number(menu.demandUnits ?? 0),
     addons: menu.addons?.map((a: any) => ({ ...a, price: Number(a.price) })),
     variants: menu.variants?.map((v: any) => ({ ...v, price: Number(v.price) })),
   };
+}
+
+/** Scalar fields only — avoids Prisma rejecting unknown GraphQL keys. */
+export function menuWriteData(input: any) {
+  return {
+    name: String(input.name || "").trim(),
+    description:
+      input.description == null || input.description === ""
+        ? null
+        : String(input.description),
+    image: input.image == null || input.image === "" ? null : String(input.image),
+    fixedPrice: Number(input.fixedPrice),
+    lowestPrice: input.lowestPrice == null ? null : Number(input.lowestPrice),
+    highestPrice: input.highestPrice == null ? null : Number(input.highestPrice),
+    step: input.step == null ? null : Number(input.step),
+    currentPrice:
+      input.currentPrice == null
+        ? Number(input.fixedPrice)
+        : Number(input.currentPrice),
+    unitsPerStep: Math.max(
+      1,
+      Math.floor(Number(input.unitsPerStep) || 5),
+    ),
+    pricingEnabled: Boolean(input.pricingEnabled),
+    isEnable: input.isEnable !== false,
+    tags: Array.isArray(input.tags)
+      ? input.tags.map((t: unknown) => String(t))
+      : [],
+    subCategoryId: String(input.subCategoryId),
+  };
+}
+
+function normalizeMenuOptions(rows: any[] | null | undefined) {
+  if (!Array.isArray(rows)) return [];
+  return rows
+    .map((row) => ({
+      id: row?.id ? String(row.id) : undefined,
+      name: String(row?.name || "").trim(),
+      price: Number(row?.price),
+    }))
+    .filter((row) => row.name && Number.isFinite(row.price));
+}
+
+/** Replace menu variants + addons from admin form payload. */
+export async function syncMenuOptions(
+  menuId: string,
+  input: { variants?: any[] | null; addons?: any[] | null },
+) {
+  const variants = normalizeMenuOptions(input.variants);
+  const addons = normalizeMenuOptions(input.addons);
+
+  const existingAddonIds = (
+    await prisma.menuAddon.findMany({
+      where: { menuId },
+      select: { id: true },
+    })
+  ).map((a) => a.id);
+  if (existingAddonIds.length) {
+    await prisma.cartItemAddon.deleteMany({
+      where: { menuAddonId: { in: existingAddonIds } },
+    });
+    await prisma.orderItemAddon.deleteMany({
+      where: { menuAddonId: { in: existingAddonIds } },
+    });
+    await prisma.menuAddon.deleteMany({ where: { menuId } });
+  }
+
+  const existingVariantIds = (
+    await prisma.menuVariant.findMany({
+      where: { menuId },
+      select: { id: true },
+    })
+  ).map((v) => v.id);
+  if (existingVariantIds.length) {
+    await prisma.cartItem.updateMany({
+      where: { menuVariantId: { in: existingVariantIds } },
+      data: { menuVariantId: null },
+    });
+    await prisma.orderItem.updateMany({
+      where: { menuVariantId: { in: existingVariantIds } },
+      data: { menuVariantId: null },
+    });
+    await prisma.comboItem.updateMany({
+      where: { menuVariantId: { in: existingVariantIds } },
+      data: { menuVariantId: null },
+    });
+    await prisma.menuVariant.deleteMany({ where: { menuId } });
+  }
+
+  if (variants.length) {
+    await prisma.menuVariant.createMany({
+      data: variants.map((v) => ({
+        menuId,
+        name: v.name,
+        price: v.price,
+      })),
+    });
+  }
+  if (addons.length) {
+    await prisma.menuAddon.createMany({
+      data: addons.map((a) => ({
+        menuId,
+        name: a.name,
+        price: a.price,
+      })),
+    });
+  }
 }
 
 export const menuInclude = {
@@ -111,6 +221,226 @@ export function mapBelt(belt: any, menus: any[]) {
     })),
     menus,
   };
+}
+
+export const pageInclude = {
+  blocks: {
+    orderBy: { sortOrder: "asc" as const },
+    include: {
+      belt: { include: beltInclude },
+    },
+  },
+} as const;
+
+export function normalizeButtons(raw: unknown) {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((item) => {
+      if (!item || typeof item !== "object") return null;
+      const label = String((item as any).label || "").trim();
+      const href = String((item as any).href || "").trim();
+      if (!label || !href) return null;
+      const variant =
+        (item as any).variant === "secondary" ? "secondary" : "primary";
+      return { label, href, variant };
+    })
+    .filter(Boolean) as Array<{
+    label: string;
+    href: string;
+    variant: string;
+  }>;
+}
+
+type BannerSlide = {
+  src: string;
+  header: string;
+  subheader: string;
+  buttons: Array<{ label: string; href: string; variant: string }>;
+};
+
+function parseBannerCopy(content: string | null | undefined) {
+  if (!content?.trim()) return { header: "", subheader: "" };
+  try {
+    const parsed = JSON.parse(content);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      return {
+        header: String(parsed.header ?? parsed.title ?? "").trim(),
+        subheader: String(parsed.subheader ?? parsed.subtitle ?? "").trim(),
+      };
+    }
+  } catch {
+    // ignore non-JSON
+  }
+  return { header: "", subheader: "" };
+}
+
+export function parseBannerSlides(
+  content: string | null | undefined,
+  images: string[] = [],
+  buttons: BannerSlide["buttons"] = [],
+): BannerSlide[] {
+  const fallback = parseBannerCopy(content);
+  const sharedButtons = normalizeButtons(buttons);
+
+  if (content?.trim()) {
+    try {
+      const parsed = JSON.parse(content);
+      if (parsed && Array.isArray(parsed.slides)) {
+        const slides = parsed.slides
+          .map((item: any) => {
+            const src = String(item?.src || "").trim();
+            if (!src) return null;
+            return {
+              src,
+              header: String(item.header ?? "").trim(),
+              subheader: String(item.subheader ?? "").trim(),
+              buttons: normalizeButtons(item.buttons),
+            } satisfies BannerSlide;
+          })
+          .filter(Boolean) as BannerSlide[];
+        if (slides.length) return slides;
+      }
+    } catch {
+      // fall through
+    }
+  }
+
+  return (images || [])
+    .map((src) => String(src || "").trim())
+    .filter(Boolean)
+    .map((src) => ({
+      src,
+      header: fallback.header,
+      subheader: fallback.subheader,
+      buttons: sharedButtons,
+    }));
+}
+
+function normalizeSlides(raw: unknown): BannerSlide[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((item) => {
+      if (!item || typeof item !== "object") return null;
+      const src = String((item as any).src || "").trim();
+      if (!src) return null;
+      return {
+        src,
+        header: String((item as any).header ?? "").trim(),
+        subheader: String((item as any).subheader ?? "").trim(),
+        buttons: normalizeButtons((item as any).buttons),
+      } satisfies BannerSlide;
+    })
+    .filter(Boolean) as BannerSlide[];
+}
+
+export async function mapPage(page: any) {
+  const blocks = await Promise.all(
+    (page.blocks || []).map(async (block: any) => {
+      const buttons = normalizeButtons(block.buttons);
+      const slides = parseBannerSlides(block.content, block.images, buttons);
+      if (block.type === "BELT" && block.belt) {
+        const menus = await resolveBeltMenus(block.belt);
+        return {
+          ...block,
+          buttons,
+          slides,
+          belt: mapBelt(block.belt, menus),
+        };
+      }
+      return {
+        ...block,
+        buttons,
+        slides,
+        belt: block.belt ? mapBelt(block.belt, []) : null,
+      };
+    }),
+  );
+  return { ...page, blocks };
+}
+
+export async function persistPage(input: any, id?: string) {
+  const title = String(input.title || "").trim();
+  if (!title) throw new Error("Page title is required");
+  const slug = slugifyPage(input.slug || title);
+  if (!slug) throw new Error("Page slug is required");
+
+  const blocks: any[] = Array.isArray(input.blocks) ? input.blocks : [];
+  const data = {
+    title,
+    slug,
+    isEnable: input.isEnable ?? true,
+    sortOrder: input.sortOrder ?? 0,
+  };
+
+  if (id) {
+    await prisma.pageBlock.deleteMany({ where: { pageId: id } });
+    const page = await prisma.page.update({
+      where: { id },
+      data: {
+        ...data,
+        blocks: {
+          create: blocks.map((b, index) => mapBlockCreate(b, index)),
+        },
+      },
+      include: pageInclude,
+    });
+    return mapPage(page);
+  }
+
+  const page = await prisma.page.create({
+    data: {
+      ...data,
+      blocks: {
+        create: blocks.map((b, index) => mapBlockCreate(b, index)),
+      },
+    },
+    include: pageInclude,
+  });
+  return mapPage(page);
+}
+
+function mapBlockCreate(b: any, index: number) {
+  const isImage = b.type === "IMAGE";
+  const isBanner = isImage && Boolean(b.isBanner);
+  const fromInput = isImage ? normalizeSlides(b.slides) : [];
+  const slides = isImage
+    ? fromInput.length
+      ? fromInput
+      : parseBannerSlides(b.content, b.images || [], normalizeButtons(b.buttons))
+    : [];
+  const images = isImage
+    ? slides.length
+      ? slides.map((s) => s.src)
+      : b.images || []
+    : [];
+
+  return {
+    type: b.type,
+    sortOrder: b.sortOrder ?? index,
+    isEnable: b.isEnable ?? true,
+    images,
+    imageLayout: isImage ? b.imageLayout || null : null,
+    isBanner,
+    buttons: isBanner
+      ? slides[0]?.buttons || []
+      : isImage
+        ? normalizeButtons(b.buttons)
+        : [],
+    content: isBanner
+      ? JSON.stringify({ slides })
+      : b.type === "RICH_TEXT" || b.type === "MENU_BROWSE"
+        ? b.content || null
+        : null,
+    beltId: b.type === "BELT" ? b.beltId || null : null,
+  };
+}
+
+function slugifyPage(s: string) {
+  return s
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
 }
 
 export async function persistBelt(input: any, id?: string) {

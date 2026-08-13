@@ -15,9 +15,14 @@ export type CartItem = {
   id: string;
   quantity: number;
   salePrice: number;
-  menu?: { id: string; name: string; pricingEnabled?: boolean } | null;
+  menu?: {
+    id: string;
+    name: string;
+    image?: string | null;
+    pricingEnabled?: boolean;
+  } | null;
   menuVariant?: { id: string; name: string } | null;
-  combo?: { id: string; name: string } | null;
+  combo?: { id: string; name: string; image?: string | null } | null;
   addons?: { id: string; menuAddon: { id: string; name: string; price: number } }[];
 };
 

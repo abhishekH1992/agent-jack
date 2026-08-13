@@ -1,30 +1,18 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { ItemModal, ModalMenu } from "@/components/menu/ItemModal";
 import { BidChatModal } from "@/components/bid/BidChatModal";
-import { MenuSearch } from "@/components/menu/MenuSearch";
 import { BeltSection } from "@/components/menu/BeltSection";
-import { flattenMenusFromCategories, type SearchableMenu } from "@/lib/search";
 
-export function HomeClient({
-  belts,
-  categories,
-}: {
-  belts: any[];
-  categories: any[];
-}) {
+export function HomeClient({ belts }: { belts: any[] }) {
   const [foodMenu, setFoodMenu] = useState<ModalMenu | null>(null);
   const [bidMenu, setBidMenu] = useState<ModalMenu | null>(null);
 
-  const allMenus = useMemo(
-    () => flattenMenusFromCategories(categories),
-    [categories],
-  );
-
-  function openMenu(menu: SearchableMenu | ModalMenu | any) {
+  function openMenu(menu: ModalMenu | any) {
     const normalized = {
       ...menu,
+      image: menu.image || null,
       variants: menu.variants || [],
       addons: menu.addons || [],
       pricingEnabled: Boolean(menu.pricingEnabled),
@@ -36,10 +24,6 @@ export function HomeClient({
 
   return (
     <div id="menu" className="page-shell space-y-10 py-6 pb-32 sm:space-y-12 sm:py-8">
-      <section className="w-full">
-        <MenuSearch menus={allMenus} onSelect={openMenu} />
-      </section>
-
       {belts.map((belt) => (
         <BeltSection
           key={belt.id}
