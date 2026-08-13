@@ -356,6 +356,12 @@ export const typeDefs = `#graphql
     revenue: Float!
   }
 
+  type SalesSummary {
+    lifetimeNzd: Float!
+    weekNzd: Float!
+    priorWeekNzd: Float!
+  }
+
   type MyRewards {
     pointsBalance: Int!
     stampsBalance: Int!
@@ -398,6 +404,7 @@ export const typeDefs = `#graphql
       redeemStampMenuId: ID
     ): CouponPreview!
     tableRevenue(days: Int): [TableRevenue!]!
+    salesSummary: SalesSummary!
   }
 
   input CartInput {
