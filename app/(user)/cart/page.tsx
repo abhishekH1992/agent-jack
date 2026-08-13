@@ -71,7 +71,7 @@ export default function CartPage() {
                   key={item.id}
                   className="surface-card border-none p-3 sm:p-4"
                 >
-                  <div className="flex items-center gap-3 sm:gap-4">
+                  <div className="flex items-start gap-3 sm:gap-4">
                     <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-[var(--brand-soft)] sm:h-20 sm:w-20">
                       {image ? (
                         // eslint-disable-next-line @next/next/no-img-element
@@ -88,11 +88,11 @@ export default function CartPage() {
                     </div>
 
                     <div className="min-w-0 flex-1">
-                      <div className="truncate font-semibold leading-snug">
+                      <div className="break-words font-semibold leading-snug">
                         {name || "Item"}
                       </div>
                       {item.addons?.length ? (
-                        <div className="mt-0.5 truncate text-xs text-[var(--muted)]">
+                        <div className="mt-0.5 break-words text-xs text-[var(--muted)]">
                           {item.addons.map((a) => a.menuAddon.name).join(", ")}
                         </div>
                       ) : null}
@@ -101,8 +101,8 @@ export default function CartPage() {
                       </div>
                     </div>
 
-                    <div className="shrink-0 text-right">
-                      <div className="font-bold tabular-nums">
+                    <div className="shrink-0 pt-0.5 text-right">
+                      <div className="whitespace-nowrap font-bold tabular-nums">
                         {money(lineTotal)}
                       </div>
                       <button

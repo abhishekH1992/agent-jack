@@ -2,9 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { AuthControls } from "@/components/layout/AuthControls";
 import { SiteDrawer } from "@/components/layout/SiteDrawer";
-import { useCart } from "@/components/cart/CartProvider";
 import { getTableId } from "@/lib/cart";
 
 export function Header({
@@ -14,7 +12,6 @@ export function Header({
   siteName?: string;
   siteLogo?: string | null;
 }) {
-  const { itemCount } = useCart();
   const [tableLabel, setTableLabel] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const hasLogo = Boolean(siteLogo?.trim());
@@ -47,7 +44,7 @@ export function Header({
 
           <Link
             href="/"
-            className="absolute left-1/2 min-w-0 max-w-[46%] -translate-x-1/2 cursor-pointer text-center"
+            className="absolute left-1/2 min-w-0 max-w-[70%] -translate-x-1/2 cursor-pointer text-center"
             aria-label={siteName}
           >
             {hasLogo ? (
@@ -67,20 +64,7 @@ export function Header({
             </div>
           </Link>
 
-          <nav className="flex items-center gap-2">
-            <Link
-              href="/cart"
-              className="btn btn-secondary relative !min-h-11 !rounded-full !px-3 sm:!px-4"
-            >
-              Cart
-              {itemCount > 0 ? (
-                <span className="ml-1.5 inline-flex min-h-5 min-w-5 items-center justify-center rounded-full bg-[var(--cta)] px-1.5 text-[10px] font-bold text-white">
-                  {itemCount}
-                </span>
-              ) : null}
-            </Link>
-            <AuthControls />
-          </nav>
+          <div className="min-h-11 min-w-11" aria-hidden />
         </div>
       </header>
 

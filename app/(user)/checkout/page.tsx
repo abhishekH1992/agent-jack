@@ -2,7 +2,7 @@ import { CheckoutForm } from "@/components/checkout/CheckoutForm";
 
 export default function CheckoutPage() {
   return (
-    <div className="page-shell py-6 sm:py-8">
+    <div className="page-shell py-6 pb-32 sm:py-8">
       <h1 className="font-display mb-2 text-3xl font-bold sm:text-4xl">
         Checkout
       </h1>
