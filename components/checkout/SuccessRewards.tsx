@@ -11,12 +11,14 @@ import { CONFIRM_CHECKOUT, REWARD_SETTINGS_QUERY } from "@/lib/queries";
 
 type OrderEarn = {
   id: string;
+  orderNumber: string;
   pointsEarned: number;
   stampsEarned: number;
   pointsRedeemed: number;
   pointsDiscountNzd: number;
   stampRedeemed: boolean;
   stampMenu?: { id: string; name: string } | null;
+  table?: { id: string; name: string } | null;
 };
 
 export function SuccessRewards({
@@ -129,8 +131,36 @@ function ConfirmPaid({
     };
   }, [orderId, sessionId, request]);
 
-  if (!authed) return null;
-  return <EarnedCopy order={order} />;
+  return (
+    <div className="mt-4 space-y-3">
+      {order ? (
+        <>
+          <div className="rounded-2xl bg-[var(--brand-soft)] px-4 py-3">
+            <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--muted)]">
+              Order number
+            </div>
+            <div className="font-display text-2xl font-bold tracking-wide">
+              {order.orderNumber}
+            </div>
+            {order.table?.name ? (
+              <div className="mt-1 text-sm text-[var(--muted)]">
+                Table {order.table.name}
+              </div>
+            ) : null}
+          </div>
+          <Link
+            href={`/orders/${order.id}`}
+            className="inline-flex min-h-12 w-full items-center justify-center rounded-full border-2 border-[var(--brand)] px-6 text-sm font-semibold text-[var(--brand)]"
+          >
+            View your order
+          </Link>
+        </>
+      ) : orderId || sessionId ? (
+        <p className="text-sm text-[var(--muted)]">Confirming your order…</p>
+      ) : null}
+      {authed ? <EarnedCopy order={order} /> : null}
+    </div>
+  );
 }
 
 function EarnedCopy({ order }: { order: OrderEarn | null }) {
@@ -160,7 +190,7 @@ function EarnedCopy({ order }: { order: OrderEarn | null }) {
   }
 
   return (
-    <div className="mt-4 space-y-3">
+    <div className="space-y-3">
       {applied.length ? (
         <p className="text-sm font-semibold">
           Rewards applied: {applied.join(" · ")}

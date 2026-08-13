@@ -8,7 +8,7 @@ export default async function SuccessPage({
 }) {
   const params = await searchParams;
   return (
-    <div className="page-shell flex min-h-[70vh] items-center justify-center py-10">
+    <div className="page-shell flex min-h-[70vh] items-center justify-center py-10 pb-32">
       <div className="surface-card w-full max-w-md p-6 text-center sm:p-8">
         <div className="mx-auto mb-4 w-fit rounded-full bg-[var(--brand-soft)] px-3 py-1 text-xs font-bold uppercase tracking-wider text-[var(--brand)]">
           Order received

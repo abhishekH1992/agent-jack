@@ -11,7 +11,10 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
     <CartProvider>
       {children}
       <Toaster
-        position="top-center"
+        position="bottom-center"
+        containerStyle={{
+          bottom: "var(--toast-bottom, 1.25rem)",
+        }}
         toastOptions={{
           style: {
             background: "#111111",

@@ -126,7 +126,7 @@ function CheckoutFormBase({
 }) {
   const { cart, refresh } = useCart();
   const [tables, setTables] = useState<{ id: string; name: string }[]>([]);
-  const [tableId, setTable] = useState(getTableId() || "");
+  const [tableId, setTable] = useState("");
   const [guestName, setGuestName] = useState("");
   const [guestEmail, setGuestEmail] = useState("");
   const [note, setNote] = useState("");
@@ -156,16 +156,51 @@ function CheckoutFormBase({
       TABLES_QUERY,
     )
       .then((data) => {
-        const active = data.tables.filter((t) => t.isActive);
-        setTables(active);
-        setTable((current) => {
-          if (current && active.some((t) => t.id === current)) return current;
-          if (current) clearTableId();
-          return active[0]?.id || "";
-        });
+        setTables(data.tables.filter((t) => t.isActive));
       })
       .catch(() => undefined);
   }, []);
+
+  useEffect(() => {
+    if (!tables.length) return;
+    const preferred = getTableId() || cart?.tableId || "";
+    const match = tables.find((t) => t.id === preferred);
+    if (match) {
+      setTable((current) => (current === match.id ? current : match.id));
+      setTableId(match.id);
+      return;
+    }
+    setTable((current) => {
+      if (current && tables.some((t) => t.id === current)) return current;
+      if (preferred) clearTableId();
+      const fallback = tables[0]?.id || "";
+      if (fallback) setTableId(fallback);
+      return fallback;
+    });
+  }, [tables, cart?.tableId]);
+
+  useEffect(() => {
+    if (!cart?.id || !tableId || tableId === cart.tableId) return;
+    let cancelled = false;
+    gql(UPDATE_CART, { id: cart.id, tableId }, authHeaders)
+      .then(() => {
+        if (!cancelled) return refresh();
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        if (isStaleTableError(err)) {
+          clearTableId();
+          const fallback = tables[0]?.id || "";
+          setTable(fallback);
+          if (fallback) setTableId(fallback);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+    // Persist the selected table onto the cart without looping on auth header identity.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cart?.id, cart?.tableId, tableId]);
 
   useEffect(() => {
     gql<{ rewardSettings: { enabled: boolean } }>(REWARD_SETTINGS_QUERY)
@@ -350,7 +385,12 @@ function CheckoutFormBase({
           <select
             className="input"
             value={tableId}
-            onChange={(e) => setTable(e.target.value)}
+            onChange={(e) => {
+              const next = e.target.value;
+              setTable(next);
+              if (next) setTableId(next);
+              else clearTableId();
+            }}
           >
             <option value="">Select table</option>
             {tables.map((t) => (
@@ -376,10 +416,12 @@ function CheckoutFormBase({
         <div className="space-y-2 text-sm">
           {items.map((item) => (
             <div key={item.id} className="flex justify-between gap-3">
-              <span>
+              <span className="min-w-0 break-words">
                 {item.combo?.name || item.menu?.name} × {item.quantity}
               </span>
-              <span>{money(Number(item.salePrice) * item.quantity)}</span>
+              <span className="shrink-0 tabular-nums">
+                {money(Number(item.salePrice) * item.quantity)}
+              </span>
             </div>
           ))}
         </div>
@@ -486,17 +528,10 @@ function CheckoutFormBase({
             </Link>
           </CheckoutExtra>
         ) : rewardsOn && !signedIn ? (
-          <CheckoutExtra
-            title="Rewards"
-            hint="Sign in to redeem"
-            open={showRewards}
-            onToggle={() => setShowRewards((v) => !v)}
-          >
-            <p className="text-sm text-[var(--muted)]">
-              Sign in to earn and redeem points and stamps. Guest checkout does
-              not earn rewards.
-            </p>
-          </CheckoutExtra>
+          <p className="mt-4 text-sm text-[var(--muted)]">
+            Sign in above to earn points and stamps on this order. Guest
+            checkout skips rewards.
+          </p>
         ) : null}
 
         <CheckoutExtra

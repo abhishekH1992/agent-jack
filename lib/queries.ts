@@ -526,9 +526,18 @@ export const UPDATE_REWARD_SETTINGS = `
 export const ORDER_BY_ID_QUERY = `
   query OrderById($id: ID!) {
     order(id: $id) {
-      id orderNumber status totalAmount pointsEarned stampsEarned
-      pointsRedeemed pointsDiscountNzd stampRedeemed
+      id orderNumber status totalAmount guestName guestEmail note createdAt
+      pointsRedeemed pointsDiscountNzd stampRedeemed pointsEarned stampsEarned
+      couponCode couponDiscountNzd
+      coupon { id code percentOff }
+      table { id name }
       stampMenu { id name }
+      items {
+        id quantity salePrice
+        menu { id name pricingEnabled }
+        menuVariant { id name }
+        combo { id name }
+      }
     }
   }
 `;
@@ -539,6 +548,7 @@ export const CONFIRM_CHECKOUT = `
       id orderNumber status totalAmount pointsEarned stampsEarned
       pointsRedeemed pointsDiscountNzd stampRedeemed
       stampMenu { id name }
+      table { id name }
     }
   }
 `;

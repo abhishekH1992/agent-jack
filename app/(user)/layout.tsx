@@ -1,5 +1,5 @@
 import { Header } from "@/components/layout/Header";
-import { StickyCartBar } from "@/components/layout/StickyCartBar";
+import { BottomNav } from "@/components/layout/BottomNav";
 import { gql } from "@/lib/graphql";
 import { SITE_QUERY } from "@/lib/queries";
 
@@ -27,7 +27,7 @@ export default async function UserLayout({
     <div className="min-h-screen">
       <Header siteName={siteName} siteLogo={siteLogo} />
       <main>{children}</main>
-      <StickyCartBar />
+      <BottomNav />
     </div>
   );
 }

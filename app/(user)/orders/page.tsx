@@ -193,7 +193,13 @@ function OrdersList() {
                 >
                   <div className="min-w-0">
                     <div className="font-semibold tracking-wide">
-                      {order.orderNumber}
+                      <Link
+                        href={`/orders/${order.id}`}
+                        className="underline-offset-2 hover:underline"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {order.orderNumber}
+                      </Link>
                     </div>
                     <div className="mt-0.5 text-sm text-[var(--muted)]">
                       Table {order.table?.name || "—"} ·{" "}

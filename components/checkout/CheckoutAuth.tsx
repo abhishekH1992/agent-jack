@@ -38,6 +38,35 @@ function Fields({
   );
 }
 
+export function CheckoutSignInButton({ className }: { className?: string }) {
+  if (!CLERK_ENABLED) {
+    return (
+      <a
+        href="/sign-in?redirect_url=/checkout"
+        className={
+          className ||
+          "btn btn-primary mt-3 inline-flex min-h-11 w-full !rounded-xl"
+        }
+      >
+        Sign in
+      </a>
+    );
+  }
+
+  return (
+    <SignInButton mode="modal">
+      <Button
+        className={
+          className ||
+          "mt-3 min-h-11 w-full bg-[var(--brand)] font-semibold text-white"
+        }
+      >
+        Sign in to earn rewards
+      </Button>
+    </SignInButton>
+  );
+}
+
 function ClerkCheckoutFields(props: {
   guestName: string;
   guestEmail: string;
@@ -56,20 +85,21 @@ function ClerkCheckoutFields(props: {
 
   return (
     <>
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <h2 className="font-bold">Your details</h2>
-        {!isSignedIn && (
-          <SignInButton mode="modal">
-            <Button className="min-h-11 bg-[var(--cta)] font-semibold text-white">
-              Sign in
-            </Button>
-          </SignInButton>
-        )}
-      </div>
-      <p className="mb-3 text-sm text-[var(--muted)]">
-        Continue as guest or sign in with Google, Facebook, or Apple. Sign in
-        to earn and redeem rewards.
-      </p>
+      <h2 className="mb-2 font-bold">Your details</h2>
+      {!isSignedIn ? (
+        <div className="mb-4 rounded-2xl border border-[var(--brand)]/30 bg-[var(--brand-soft)] p-4">
+          <p className="font-bold">Earn rewards on this order</p>
+          <p className="mt-1 text-sm text-[var(--muted)]">
+            Sign in with Google, Apple, or email to collect points and stamps.
+            You can still check out as a guest — you just won’t earn rewards.
+          </p>
+          <CheckoutSignInButton />
+        </div>
+      ) : (
+        <p className="mb-3 text-sm text-[var(--muted)]">
+          Signed in — points and stamps apply to this order.
+        </p>
+      )}
       <Fields {...props} />
     </>
   );
