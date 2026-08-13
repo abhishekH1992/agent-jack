@@ -227,6 +227,7 @@ function CheckoutFormBase({
     )
       .then((data) => setMyRewards(data.myRewards))
       .catch(() => undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- headers follow signedIn
   }, [signedIn, cart?.id]);
 
   async function pay() {

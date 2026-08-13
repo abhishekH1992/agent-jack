@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import Link from "next/link";
 import { Button } from "@heroui/react";
 import { SignInButton, useUser } from "@clerk/nextjs";
 import { CLERK_ENABLED } from "@/lib/config";
@@ -41,7 +42,7 @@ function Fields({
 export function CheckoutSignInButton({ className }: { className?: string }) {
   if (!CLERK_ENABLED) {
     return (
-      <a
+      <Link
         href="/sign-in?redirect_url=/checkout"
         className={
           className ||
@@ -49,7 +50,7 @@ export function CheckoutSignInButton({ className }: { className?: string }) {
         }
       >
         Sign in
-      </a>
+      </Link>
     );
   }
 

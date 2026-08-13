@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { SignedIn, SignedOut, SignInButton, useAuth } from "@clerk/nextjs";
+import { SignedOut, SignInButton, useAuth } from "@clerk/nextjs";
 import { money } from "@/lib/cart";
 import { CLERK_ENABLED } from "@/lib/config";
 import { useClerkGql } from "@/lib/clerk-headers";
