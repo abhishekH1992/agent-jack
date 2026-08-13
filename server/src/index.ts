@@ -18,14 +18,17 @@ import {
 } from "./services/stripe.js";
 
 const PORT = Number(process.env.PORT || 4000);
-const CLIENT_URL = process.env.CLIENT_URL || "http://localhost:3000";
+const CLIENT_URLS = (process.env.CLIENT_URL || "http://localhost:3000")
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
 
 async function main() {
   const app = express();
   const httpServer = http.createServer(app);
 
   const io = new SocketServer(httpServer, {
-    cors: { origin: CLIENT_URL, credentials: true },
+    cors: { origin: CLIENT_URLS, credentials: true },
   });
 
   setPriceEmitter((event, payload) => {
@@ -70,7 +73,7 @@ async function main() {
 
   app.use(
     "/graphql",
-    cors({ origin: CLIENT_URL, credentials: true }),
+    cors({ origin: CLIENT_URLS, credentials: true }),
     cookieParser(),
     express.json({ type: "*/*" }),
     expressMiddleware(apollo, {
@@ -82,8 +85,8 @@ async function main() {
 
   startCooldownJob();
 
-  httpServer.listen(PORT, () => {
-    console.log(`API ready at http://localhost:${PORT}/graphql`);
+  httpServer.listen(PORT, "0.0.0.0", () => {
+    console.log(`API ready on port ${PORT}`);
   });
 }
 
