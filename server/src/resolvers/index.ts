@@ -26,7 +26,7 @@ import {
   restoreRedemption,
   rewardSettingsInclude,
 } from "../services/rewards.js";
-import { RewardRedeemOn } from "@prisma/client";
+import { OrderStatus, RewardRedeemOn } from "@prisma/client";
 import {
   createAdmin,
   deleteAdmin as removeAdminAccess,
@@ -494,7 +494,11 @@ export const resolvers = {
     },
     salesSummary: async (_: unknown, __: unknown, ctx: GraphQLContext) => {
       requireAdmin(ctx);
-      const paid = { status: { in: ["PAID", "FULFILLED"] as const } };
+      const paidStatuses: OrderStatus[] = [
+        OrderStatus.PAID,
+        OrderStatus.FULFILLED,
+      ];
+      const paid = { status: { in: paidStatuses } };
       const weekStart = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
       const priorWeekStart = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
       const [lifetime, week, priorWeek] = await Promise.all([
@@ -515,9 +519,9 @@ export const resolvers = {
         }),
       ]);
       return {
-        lifetimeNzd: Number(lifetime._sum.totalAmount || 0),
-        weekNzd: Number(week._sum.totalAmount || 0),
-        priorWeekNzd: Number(priorWeek._sum.totalAmount || 0),
+        lifetimeNzd: Number(lifetime._sum?.totalAmount || 0),
+        weekNzd: Number(week._sum?.totalAmount || 0),
+        priorWeekNzd: Number(priorWeek._sum?.totalAmount || 0),
       };
     },
   },
