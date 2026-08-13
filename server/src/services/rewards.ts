@@ -119,7 +119,7 @@ function comboItemWeight(ci: {
 
 /** Line amount a FOOD/LIQUOR coupon may discount (prorates mixed combos). */
 function qualifyingLineAmount(
-  item: Parameters<typeof buildRewardLines>[0],
+  item: Parameters<typeof buildRewardLines>[0][number],
   applyOn: RewardRedeemOn,
 ) {
   const linePrice = lineUnitPrice(item) * item.quantity;

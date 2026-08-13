@@ -11,6 +11,9 @@ out
 .env.local
 server/.env
 
+# railway cli link
+.railway
+
 # misc
 .DS_Store
 *.pem
@@ -18,11 +21,22 @@ dist
 server/dist
 qr-restarurant
 
+# runtime admin uploads only — seed catalog images in banners/category/menu/subcategory are tracked
+public/uploads/images/*
+!public/uploads/images/.gitkeep
+
 # uploaded assets (keep folder)
 public/uploads/banners/*
 !public/uploads/banners/.gitkeep
-public/uploads/images/*
-!public/uploads/images/.gitkeep
+
+public/uploads/category/*
+!public/uploads/category/.gitkeep
+
+public/uploads/subcategory/*
+!public/uploads/subcategory/.gitkeep
+
+public/uploads/menu/*
+!public/uploads/menu/.gitkeep
 
 # debug
 npm-debug.log*
@@ -30,4 +44,3 @@ yarn-debug.log*
 yarn-error.log*
 
 tmp/
-public/uploads/

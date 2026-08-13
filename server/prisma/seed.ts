@@ -7,9 +7,20 @@ import "dotenv/config";
 const prisma = new PrismaClient();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const ROOT = path.resolve(__dirname, "../..");
-const TMP = path.join(ROOT, "tmp");
-const PUBLIC_UPLOADS = path.join(ROOT, "public", "uploads");
+const SERVER_ROOT = path.resolve(__dirname, "..");
+const REPO_ROOT = path.resolve(SERVER_ROOT, "..");
+const TMP =
+  [
+    path.join(SERVER_ROOT, "tmp"),
+    path.join(REPO_ROOT, "tmp"),
+  ].find((dir) => fs.existsSync(dir)) || path.join(REPO_ROOT, "tmp");
+const PUBLIC_UPLOADS =
+  process.env.UPLOAD_DIR ||
+  [
+    path.join(REPO_ROOT, "public", "uploads"),
+    path.join(SERVER_ROOT, "public", "uploads"),
+  ].find((dir) => fs.existsSync(path.dirname(dir))) ||
+  path.join(REPO_ROOT, "public", "uploads");
 
 const ADMIN_EMAIL = "admin@example.com";
 const ADMIN_PASSWORD = "password-qr";
@@ -29,18 +40,18 @@ function randPrice(min = 8, max = 18) {
 function useTmpImage(
   folder: "category" | "subcategory" | "menu" | "banner",
   nameOrFile: string,
-): string | null {
+): string {
   const file = nameOrFile.endsWith(".png")
     ? nameOrFile
     : `${slugify(nameOrFile)}.png`;
+  const destFolder = folder === "banner" ? "banners" : folder;
   const src = path.join(TMP, folder === "banner" ? "banner" : folder, file);
-  if (!fs.existsSync(src)) return null;
-
-  const destDir = path.join(PUBLIC_UPLOADS, folder === "banner" ? "banners" : folder);
-  fs.mkdirSync(destDir, { recursive: true });
-  const dest = path.join(destDir, file);
-  fs.copyFileSync(src, dest);
-  return `/uploads/${folder === "banner" ? "banners" : folder}/${file}`;
+  if (fs.existsSync(src)) {
+    const destDir = path.join(PUBLIC_UPLOADS, destFolder);
+    fs.mkdirSync(destDir, { recursive: true });
+    fs.copyFileSync(src, path.join(destDir, file));
+  }
+  return `/uploads/${destFolder}/${file}`;
 }
 
 async function ensureClerkAdmin(): Promise<string> {
@@ -696,7 +707,7 @@ async function main() {
     data: {
       name: "Agent Jack",
       email: "hello@agentjack.local",
-      logo: "/logo.png",
+      logo: null,
       banners,
     },
   });
