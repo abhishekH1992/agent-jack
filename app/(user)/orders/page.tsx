@@ -32,6 +32,9 @@ type Order = {
   stampRedeemed: boolean;
   pointsEarned: number;
   stampsEarned: number;
+  couponCode?: string | null;
+  couponDiscountNzd?: number;
+  coupon?: { id: string; code: string; percentOff: number } | null;
   table?: { id: string; name: string } | null;
   stampMenu?: { id: string; name: string } | null;
   items: OrderItem[];
@@ -210,6 +213,12 @@ function OrdersList() {
                           : ""}
                       </div>
                     ) : null}
+                    {Number(order.couponDiscountNzd) > 0 ? (
+                      <div className="mt-1 text-[11px] font-bold text-amber-800">
+                        {order.couponCode || order.coupon?.code || "Coupon"} · −
+                        {money(Number(order.couponDiscountNzd))}
+                      </div>
+                    ) : null}
                   </div>
                   <div className="shrink-0 text-right">
                     <div className="font-bold">
@@ -232,12 +241,14 @@ function OrdersList() {
                     {order.note ? (
                       <p className="mb-3 text-sm text-[var(--muted)]">
                         <span className="font-semibold text-[var(--ink)]">
-                          Note:{" "}
+                          Kitchen / allergies:{" "}
                         </span>
                         {order.note}
                       </p>
                     ) : null}
-                    {(order.pointsRedeemed > 0 || order.stampRedeemed) && (
+                    {(order.pointsRedeemed > 0 ||
+                      order.stampRedeemed ||
+                      Number(order.couponDiscountNzd) > 0) && (
                       <div className="mb-3 space-y-1 text-sm">
                         {order.pointsRedeemed > 0 ? (
                           <p className="font-semibold text-sky-800">
@@ -250,6 +261,15 @@ function OrdersList() {
                             Stamp applied
                             {order.stampMenu?.name
                               ? `: 1 free ${order.stampMenu.name}`
+                              : ""}
+                          </p>
+                        ) : null}
+                        {Number(order.couponDiscountNzd) > 0 ? (
+                          <p className="font-semibold text-amber-800">
+                            Coupon {order.couponCode || order.coupon?.code} ·{" "}
+                            {money(Number(order.couponDiscountNzd))} off
+                            {order.coupon?.percentOff
+                              ? ` (${order.coupon.percentOff}%)`
                               : ""}
                           </p>
                         ) : null}

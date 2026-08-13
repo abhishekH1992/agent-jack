@@ -29,6 +29,9 @@ export type Order = {
   stampRedeemed: boolean;
   pointsRedeemed: number;
   pointsDiscountNzd: number;
+  couponCode?: string | null;
+  couponDiscountNzd?: number;
+  coupon?: { id: string; code: string; percentOff: number } | null;
   pointsEarned: number;
   table?: { id: string; name: string } | null;
   user?: { id: string; name?: string | null; email?: string | null } | null;
@@ -194,6 +197,14 @@ export function OrderDetail({
               : "None"
           }
         />
+        <Meta
+          label="Coupon"
+          value={
+            Number(order.couponDiscountNzd) > 0
+              ? `${order.couponCode || order.coupon?.code || "Promo"} (−${money(Number(order.couponDiscountNzd))})`
+              : "None"
+          }
+        />
       </div>
 
       {(order.pointsRedeemed > 0 || order.pointsEarned > 0) && (
@@ -223,9 +234,29 @@ export function OrderDetail({
         </div>
       )}
 
+      {Number(order.couponDiscountNzd) > 0 ? (
+        <div className="rounded-xl border border-[var(--line)] px-3 py-3">
+          <div className="text-[11px] font-semibold uppercase tracking-wider text-[var(--muted)]">
+            Coupon
+          </div>
+          <p className="mt-1 text-sm">
+            <span className="font-semibold">
+              {order.couponCode || order.coupon?.code || "Promo"}
+            </span>
+            {" · "}
+            {money(Number(order.couponDiscountNzd))} off this order
+            {order.coupon?.percentOff
+              ? ` (${order.coupon.percentOff}%)`
+              : ""}
+          </p>
+        </div>
+      ) : null}
+
       {order.note ? (
         <div className="rounded-xl bg-[var(--page)] px-3 py-2 text-sm">
-          <span className="font-semibold text-[var(--muted)]">Note: </span>
+          <span className="font-semibold text-[var(--muted)]">
+            Kitchen / allergies:{" "}
+          </span>
           {order.note}
         </div>
       ) : null}
@@ -400,10 +431,10 @@ export function PrintTicket({ order }: { order: Order }) {
         <div>{formatWhen(order.createdAt)}</div>
       </div>
 
-      {order.pointsRedeemed > 0 || order.stampRedeemed ? (
+      {order.pointsRedeemed > 0 || order.stampRedeemed || Number(order.couponDiscountNzd) > 0 ? (
         <div className="border-2 border-black p-2">
           <div className="text-xs font-black uppercase tracking-wider">
-            Rewards applied
+            Discounts applied
           </div>
           {order.pointsRedeemed > 0 ? (
             <div className="mt-1 font-bold">
@@ -417,12 +448,18 @@ export function PrintTicket({ order }: { order: Order }) {
               {order.stampMenu?.name ? ` ${order.stampMenu.name}` : " ITEM"}
             </div>
           ) : null}
+          {Number(order.couponDiscountNzd) > 0 ? (
+            <div className="mt-1 font-bold">
+              COUPON {order.couponCode || order.coupon?.code}: −
+              {money(Number(order.couponDiscountNzd))}
+            </div>
+          ) : null}
         </div>
       ) : null}
 
       {order.note ? (
         <div className="border border-dashed border-black p-2">
-          <strong>Note:</strong> {order.note}
+          <strong>Kitchen / allergies:</strong> {order.note}
         </div>
       ) : null}
 

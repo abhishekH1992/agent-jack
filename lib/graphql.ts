@@ -10,13 +10,24 @@ export async function gql<T>(
   variables?: Record<string, unknown>,
   headers?: Record<string, string>,
 ): Promise<T> {
+  if (!query?.trim()) {
+    throw new Error("GraphQL query is missing");
+  }
+
+  const payload: Record<string, unknown> = { query };
+  if (variables && Object.keys(variables).length > 0) {
+    payload.variables = variables;
+  }
+
   const res = await fetch(GRAPHQL_URL, {
     method: "POST",
     headers: {
-      "Content-Type": "application/json",
       ...headers,
+      "Content-Type": "application/json",
+      Accept: "application/json",
+      "Apollo-Require-Preflight": "true",
     },
-    body: JSON.stringify({ query, variables }),
+    body: JSON.stringify(payload),
     cache: "no-store",
   });
 
@@ -29,3 +40,4 @@ export async function gql<T>(
   }
   return json.data;
 }
+

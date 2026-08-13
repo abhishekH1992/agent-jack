@@ -1,17 +1,12 @@
 import Stripe from "stripe";
 import { prisma } from "../prisma.js";
 import { bumpPriceOnOrder } from "./pricing.js";
+import { computeCheckoutQuote } from "./checkout-quote.js";
 import {
   awardEarnForPaidOrder,
-  buildRewardLines,
-  cartTotalFromLines,
-  computePointsRedemption,
   deductRedemption,
-  getRewardSettings,
   injectOrderId,
-  qualifyingSubtotal,
   restoreRedemption,
-  rewardCartItemInclude,
 } from "./rewards.js";
 
 export function getStripe() {
@@ -28,90 +23,31 @@ export async function createCheckoutSession(input: {
   guestName?: string | null;
   guestEmail?: string | null;
   userId?: string | null;
+  note?: string | null;
+  couponCode?: string | null;
   successUrl: string;
   cancelUrl: string;
   redeemPoints?: boolean | null;
   redeemStampMenuId?: string | null;
 }) {
-  if ((input.redeemPoints || input.redeemStampMenuId) && !input.userId) {
-    throw new Error("Sign in to redeem rewards");
-  }
-
-  const cart = await prisma.cart.findUnique({
-    where: { id: input.cartId },
-    include: {
-      items: { include: rewardCartItemInclude },
-    },
+  const quote = await computeCheckoutQuote({
+    cartId: input.cartId,
+    userId: input.userId,
+    redeemPoints: input.redeemPoints,
+    redeemStampMenuId: input.redeemStampMenuId,
+    couponCode: input.couponCode,
   });
 
-  if (!cart || cart.items.length === 0) {
-    throw new Error("Cart is empty");
-  }
-
-  const settings = await getRewardSettings();
-  const lines = buildRewardLines(cart.items, settings);
-  const total = cartTotalFromLines(lines);
-
-  let stampMenuId: string | null = null;
-  let stampFreeAmount = 0;
-  if (
-    input.redeemStampMenuId &&
-    input.userId &&
-    settings.enabled &&
-    settings.stampsEnabled
-  ) {
-    const stampOk = settings.stampMenus.some(
-      (s) => s.menuId === input.redeemStampMenuId,
-    );
-    const inCart = lines.some(
-      (l) => l.menuId === input.redeemStampMenuId && l.quantity > 0,
-    );
-    if (!stampOk || !inCart) {
-      throw new Error("That item is not on the stamp card");
-    }
-    const reward = await prisma.userReward.findUnique({
-      where: { userId: input.userId },
-    });
-    if (!reward || reward.stampsBalance < settings.stampsRequired) {
-      throw new Error("Not enough stamps to redeem");
-    }
-    stampMenuId = input.redeemStampMenuId;
-    stampFreeAmount =
-      lines.find((l) => l.menuId === stampMenuId)?.unitPrice || 0;
-  }
-
-  const payableAfterStamp = Math.round((total - stampFreeAmount) * 100) / 100;
-  if (payableAfterStamp < 0.5) {
-    throw new Error(
-      "Add another item — Stripe needs a minimum charge after rewards",
-    );
-  }
-
-  let pointsSpent = 0;
-  let discountNzd = 0;
-  if (input.redeemPoints && input.userId && settings.enabled) {
-    const reward = await prisma.userReward.findUnique({
-      where: { userId: input.userId },
-    });
-    const redemption = computePointsRedemption({
-      balance: reward?.pointsBalance || 0,
-      settings,
-      qualifyingSubtotal: qualifyingSubtotal(lines),
-      payableAfterStamp,
-    });
-    if (redemption.pointsSpent <= 0) {
-      throw new Error("Not enough points to redeem on this order");
-    }
-    pointsSpent = redemption.pointsSpent;
-    discountNzd = redemption.discountNzd;
-  }
-
-  const payable = Math.round((payableAfterStamp - discountNzd) * 100) / 100;
-  if (payable < 0.5) {
-    throw new Error(
-      "Add another item — Stripe needs a minimum charge after rewards",
-    );
-  }
+  const {
+    cart,
+    settings,
+    stampMenuId,
+    pointsSpent,
+    discountNzd,
+    coupon,
+    couponDiscountNzd,
+    payable,
+  } = quote;
 
   let stampApplied = false;
   const line_items: Stripe.Checkout.SessionCreateParams.LineItem[] = [];
@@ -165,6 +101,8 @@ export async function createCheckoutSession(input: {
     }
   }
 
+  const stripeDiscountNzd = Math.round((discountNzd + couponDiscountNzd) * 100) / 100;
+  const kitchenNote = (input.note ?? cart.note)?.trim() || undefined;
   const orderNumber = `AJ-${Date.now().toString().slice(-8)}`;
   const order = await prisma.order.create({
     data: {
@@ -174,11 +112,14 @@ export async function createCheckoutSession(input: {
       userId: input.userId || cart.userId,
       guestName: input.guestName || undefined,
       guestEmail: input.guestEmail || undefined,
-      note: cart.note || undefined,
+      note: kitchenNote,
       status: "PENDING",
       totalAmount: payable,
       pointsRedeemed: pointsSpent,
       pointsDiscountNzd: discountNzd,
+      couponId: coupon?.id,
+      couponCode: coupon?.code,
+      couponDiscountNzd,
       stampRedeemed: Boolean(stampMenuId),
       stampMenuId: stampMenuId || undefined,
       items: {
@@ -217,12 +158,17 @@ export async function createCheckoutSession(input: {
   const stripe = getStripe();
   let couponId: string | undefined;
   try {
-    if (discountNzd > 0) {
+    if (stripeDiscountNzd > 0) {
       const coupon = await stripe.coupons.create({
-        amount_off: Math.round(discountNzd * 100),
+        amount_off: Math.round(stripeDiscountNzd * 100),
         currency: "nzd",
         duration: "once",
-        name: `Rewards ${pointsSpent} pts`,
+        name: [
+          pointsSpent > 0 ? `Rewards ${pointsSpent} pts` : null,
+          quote.coupon?.code ? `Promo ${quote.coupon.code}` : null,
+        ]
+          .filter(Boolean)
+          .join(" + ") || "Discount",
       });
       couponId = coupon.id;
     }

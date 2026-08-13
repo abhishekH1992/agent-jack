@@ -215,6 +215,9 @@ export const typeDefs = `#graphql
     createdAt: DateTime!
     pointsRedeemed: Int!
     pointsDiscountNzd: Float!
+    coupon: Coupon
+    couponCode: String
+    couponDiscountNzd: Float!
     stampRedeemed: Boolean!
     stampMenu: Menu
     pointsEarned: Int!
@@ -319,6 +322,40 @@ export const typeDefs = `#graphql
     stampMenusInCart: [Menu!]!
   }
 
+  type Coupon {
+    id: ID!
+    code: String!
+    percentOff: Float!
+    minSpendNzd: Float!
+    maxDiscountNzd: Float
+    startsAt: DateTime
+    expiresAt: DateTime
+    allowWithRewards: Boolean!
+    applyOn: RewardRedeemOn!
+    isActive: Boolean!
+    createdAt: DateTime!
+  }
+
+  type CouponPreview {
+    valid: Boolean!
+    message: String!
+    code: String!
+    percentOff: Float!
+    discountNzd: Float!
+    minSpendNzd: Float!
+    maxDiscountNzd: Float
+    allowWithRewards: Boolean!
+    applyOn: RewardRedeemOn!
+    qualifyingSubtotal: Float!
+  }
+
+  type TableRevenue {
+    tableId: ID!
+    tableName: String!
+    orderCount: Int!
+    revenue: Float!
+  }
+
   type MyRewards {
     pointsBalance: Int!
     stampsBalance: Int!
@@ -351,6 +388,15 @@ export const typeDefs = `#graphql
     myRewards(cartId: ID): MyRewards!
     adminUsers: [AdminUser!]!
     adminUser(id: ID!): AdminUser
+    coupons: [Coupon!]!
+    coupon(id: ID!): Coupon
+    previewCoupon(
+      code: String!
+      cartId: ID!
+      redeemPoints: Boolean
+      redeemStampMenuId: ID
+    ): CouponPreview!
+    tableRevenue(days: Int): [TableRevenue!]!
   }
 
   input CartInput {
@@ -500,6 +546,18 @@ export const typeDefs = `#graphql
     stampMenuIds: [ID!]
   }
 
+  input CouponInput {
+    code: String!
+    percentOff: Float!
+    minSpendNzd: Float
+    maxDiscountNzd: Float
+    startsAt: DateTime
+    expiresAt: DateTime
+    allowWithRewards: Boolean
+    applyOn: RewardRedeemOn
+    isActive: Boolean
+  }
+
   type Mutation {
     createCart(input: CartInput!): Cart!
     updateCart(id: ID!, tableId: ID, note: String): Cart!
@@ -522,6 +580,8 @@ export const typeDefs = `#graphql
       tableId: ID
       guestName: String
       guestEmail: String
+      note: String
+      couponCode: String
       successUrl: String!
       cancelUrl: String!
       redeemPoints: Boolean
@@ -552,6 +612,9 @@ export const typeDefs = `#graphql
     adminForcePrice(menuId: ID!, action: String!): PriceState!
     updateSite(input: SiteInput!): Site!
     updateRewardSettings(input: RewardSettingsInput!): RewardSettings!
+    storeCoupon(input: CouponInput!): Coupon!
+    updateCoupon(id: ID!, input: CouponInput!): Coupon!
+    deleteCoupon(id: ID!): Boolean!
     updateOrderStatus(id: ID!, status: String!): Order!
     adminApplyStamp(orderId: ID!, menuId: ID): Order!
   }

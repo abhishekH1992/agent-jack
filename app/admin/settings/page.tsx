@@ -1,10 +1,34 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import toast from "react-hot-toast";
 import { adminGql } from "@/lib/admin";
 import { SITE_QUERY, UPDATE_SITE } from "@/lib/queries";
 import { ImageUploadField } from "@/components/admin/ImageUploadField";
+
+const SETTING_SECTIONS = [
+  {
+    href: "/admin/settings/tables",
+    title: "Tables",
+    body: "Add, edit, or delete tables and print QR codes for each one.",
+  },
+  {
+    href: "/admin/settings/rewards",
+    title: "Rewards",
+    body: "Points, stamp cards, and what members can redeem.",
+  },
+  {
+    href: "/admin/settings/coupons",
+    title: "Coupons",
+    body: "Promo codes, dates, min spend, and food or liquor limits.",
+  },
+  {
+    href: "/admin/settings/profile",
+    title: "Profile",
+    body: "Your admin account and sign-in details.",
+  },
+];
 
 export default function AdminSettingsPage() {
   const [name, setName] = useState("");
@@ -37,7 +61,7 @@ export default function AdminSettingsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-xl space-y-6">
+    <div className="space-y-6">
       <div>
         <h1
           className="text-3xl md:text-4xl"
@@ -73,6 +97,22 @@ export default function AdminSettingsPage() {
         >
           {saving ? "Saving…" : "Save settings"}
         </button>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        {SETTING_SECTIONS.map((item) => (
+          <Link
+            key={item.href}
+            href={item.href}
+            className="surface-card block rounded-2xl p-5 no-underline transition hover:border-[var(--brand)]"
+          >
+            <div className="font-semibold text-[var(--ink)]">{item.title}</div>
+            <p className="mt-1 text-sm text-[var(--muted)]">{item.body}</p>
+            <span className="mt-3 inline-block text-xs font-semibold text-[var(--cta)]">
+              Open →
+            </span>
+          </Link>
+        ))}
       </div>
 
       <div className="surface-card rounded-2xl p-5 text-sm text-[var(--muted)]">

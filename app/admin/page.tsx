@@ -10,6 +10,7 @@ import {
   DASHBOARD_ORDERS_QUERY,
   LIQUOR_MENUS,
   TABLES_QUERY,
+  TABLE_REVENUE_QUERY,
 } from "@/lib/queries";
 
 type OrderItem = {
@@ -20,6 +21,13 @@ type OrderItem = {
 };
 
 type SellerRow = { name: string; qty: number; revenue: number };
+
+type TableRevenue = {
+  tableId: string;
+  tableName: string;
+  orderCount: number;
+  revenue: number;
+};
 
 type Order = {
   id: string;
@@ -160,22 +168,87 @@ function TopSellersCard({
   );
 }
 
+function TopTableCard({
+  title,
+  empty,
+  rows,
+}: {
+  title: string;
+  empty: string;
+  rows: TableRevenue[];
+}) {
+  const leader = rows[0];
+  return (
+    <div className="surface-card rounded-2xl p-4">
+      <h2 className="mb-1 font-semibold">{title}</h2>
+      <p className="mb-3 text-xs text-[var(--muted)]">
+        Paid and fulfilled orders
+      </p>
+      {!leader ? (
+        <p className="text-sm text-[var(--muted)]">{empty}</p>
+      ) : (
+        <div className="space-y-3">
+          <div className="rounded-xl bg-[var(--page)] p-3">
+            <div className="text-xs font-medium uppercase tracking-[0.14em] text-[var(--muted)]">
+              Top table
+            </div>
+            <div className="mt-1 text-xl font-bold">{leader.tableName}</div>
+            <div className="mt-1 text-sm text-[var(--muted)]">
+              {money(leader.revenue)} · {leader.orderCount} order
+              {leader.orderCount === 1 ? "" : "s"}
+            </div>
+          </div>
+          {rows.length > 1 ? (
+            <ol className="space-y-2 text-sm">
+              {rows.slice(1, 5).map((row, i) => (
+                <li
+                  key={row.tableId}
+                  className="flex items-center justify-between gap-3"
+                >
+                  <span>
+                    <span className="mr-2 text-[var(--muted)]">{i + 2}.</span>
+                    {row.tableName}
+                    <span className="ml-2 text-xs text-[var(--muted)]">
+                      {row.orderCount} orders
+                    </span>
+                  </span>
+                  <span className="font-semibold tabular-nums">
+                    {money(row.revenue)}
+                  </span>
+                </li>
+              ))}
+            </ol>
+          ) : null}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function AdminDashboard() {
   const [menus, setMenus] = useState<LiquorMenu[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [tableCount, setTableCount] = useState(0);
+  const [tableRevenueAll, setTableRevenueAll] = useState<TableRevenue[]>([]);
+  const [tableRevenueWeek, setTableRevenueWeek] = useState<TableRevenue[]>([]);
   const [loadedAt, setLoadedAt] = useState<Date | null>(null);
   const [loading, setLoading] = useState(true);
 
   async function load() {
-    const [m, o, t] = await Promise.all([
+    const [m, o, t, allTime, week] = await Promise.all([
       adminGql<{ menus: LiquorMenu[] }>(LIQUOR_MENUS),
       adminGql<{ orders: Order[] }>(DASHBOARD_ORDERS_QUERY),
       adminGql<{ tables: { id: string; isActive: boolean }[] }>(TABLES_QUERY),
+      adminGql<{ tableRevenue: TableRevenue[] }>(TABLE_REVENUE_QUERY),
+      adminGql<{ tableRevenue: TableRevenue[] }>(TABLE_REVENUE_QUERY, {
+        days: 7,
+      }),
     ]);
     setMenus(m.menus);
     setOrders(o.orders);
     setTableCount(t.tables.filter((x) => x.isActive).length);
+    setTableRevenueAll(allTime.tableRevenue);
+    setTableRevenueWeek(week.tableRevenue);
     setLoadedAt(new Date());
     setLoading(false);
   }
@@ -450,6 +523,19 @@ export default function AdminDashboard() {
             Liquor pricing →
           </Link>
         </div>
+      </section>
+
+      <section className="grid gap-3 lg:grid-cols-2">
+        <TopTableCard
+          title="Most revenue · all time"
+          empty="No paid table orders yet."
+          rows={tableRevenueAll}
+        />
+        <TopTableCard
+          title="Most revenue · past 7 days"
+          empty="No paid table orders in the last 7 days."
+          rows={tableRevenueWeek}
+        />
       </section>
 
       <section className="grid gap-3 lg:grid-cols-2">

@@ -16,7 +16,10 @@ export const rewardCartItemInclude = {
   combo: {
     include: {
       items: {
-        include: { menu: { include: rewardMenuInclude } },
+        include: {
+          menu: { include: rewardMenuInclude },
+          menuVariant: true,
+        },
       },
     },
   },
@@ -102,6 +105,43 @@ function itemQualifies(
   return redeemOn === RewardRedeemOn.BOTH;
 }
 
+function comboItemWeight(ci: {
+  quantity?: number;
+  menu?: { fixedPrice?: Prisma.Decimal | number } | null;
+  menuVariant?: { price?: Prisma.Decimal | number } | null;
+}) {
+  const qty = ci.quantity || 1;
+  const variant =
+    ci.menuVariant?.price != null ? Number(ci.menuVariant.price) : 0;
+  const menu = ci.menu?.fixedPrice != null ? Number(ci.menu.fixedPrice) : 0;
+  return Math.max(variant || menu || 1, 0.01) * qty;
+}
+
+/** Line amount a FOOD/LIQUOR coupon may discount (prorates mixed combos). */
+function qualifyingLineAmount(
+  item: Parameters<typeof buildRewardLines>[0],
+  applyOn: RewardRedeemOn,
+) {
+  const linePrice = lineUnitPrice(item) * item.quantity;
+  if (applyOn === RewardRedeemOn.BOTH) return linePrice;
+  if (item.menu) {
+    return matchesRedeemOn(categoryTypeName(item.menu), applyOn) ? linePrice : 0;
+  }
+  const comboItems = item.combo?.items || [];
+  if (!comboItems.length) return 0;
+  let qualifyingWeight = 0;
+  let totalWeight = 0;
+  for (const ci of comboItems) {
+    const weight = comboItemWeight(ci);
+    totalWeight += weight;
+    if (matchesRedeemOn(categoryTypeName(ci.menu), applyOn)) {
+      qualifyingWeight += weight;
+    }
+  }
+  if (totalWeight <= 0 || qualifyingWeight <= 0) return 0;
+  return linePrice * (qualifyingWeight / totalWeight);
+}
+
 function lineUnitPrice(item: {
   salePrice: Prisma.Decimal | number;
   addons?: { menuAddon: { price: Prisma.Decimal | number } }[];
@@ -137,7 +177,13 @@ export function buildRewardLines(
     menuVariant?: { name?: string | null } | null;
     combo?: {
       name?: string | null;
-      items?: { menu?: Parameters<typeof categoryTypeName>[0] }[];
+      items?: {
+        quantity?: number;
+        menu?: ({
+          fixedPrice?: Prisma.Decimal | number;
+        } & Parameters<typeof categoryTypeName>[0]) | null;
+        menuVariant?: { price?: Prisma.Decimal | number } | null;
+      }[];
     } | null;
     addons?: { menuAddon: { price: Prisma.Decimal | number } }[];
   }[],
@@ -158,6 +204,18 @@ export function buildRewardLines(
       name,
     };
   });
+}
+
+export function catalogSubtotal(
+  items: Parameters<typeof buildRewardLines>[0],
+  applyOn: RewardRedeemOn,
+) {
+  return roundMoney(
+    items.reduce(
+      (sum, item) => sum + qualifyingLineAmount(item, applyOn),
+      0,
+    ),
+  );
 }
 
 export function qualifyingSubtotal(lines: RewardLine[]) {
@@ -513,6 +571,7 @@ export const orderAdminInclude = {
   table: true,
   user: { include: { reward: true } },
   stampMenu: { include: menuInclude },
+  coupon: true,
   items: {
     include: {
       menu: { include: menuInclude },

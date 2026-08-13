@@ -72,7 +72,7 @@ async function main() {
     "/graphql",
     cors({ origin: CLIENT_URL, credentials: true }),
     cookieParser(),
-    express.json(),
+    express.json({ type: "*/*" }),
     expressMiddleware(apollo, {
       context: async ({ req }) => buildContext({ req }),
     }),

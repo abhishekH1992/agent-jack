@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useAuth, useUser } from "@clerk/nextjs";
 import { Button, Card } from "@heroui/react";
@@ -18,6 +18,7 @@ import { gql } from "@/lib/graphql";
 import {
   CHECKOUT,
   MY_REWARDS_QUERY,
+  PREVIEW_COUPON,
   REWARD_SETTINGS_QUERY,
   TABLES_QUERY,
   UPDATE_CART,
@@ -57,6 +58,42 @@ function redeemLabel(on: RedeemOn) {
   return "food and liquor";
 }
 
+function CheckoutExtra({
+  title,
+  hint,
+  open,
+  onToggle,
+  children,
+}: {
+  title: string;
+  hint?: string;
+  open: boolean;
+  onToggle: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <div className="border-t border-[var(--line)]">
+      <button
+        type="button"
+        className="flex min-h-11 w-full items-center justify-between gap-3 py-3 text-left"
+        onClick={onToggle}
+        aria-expanded={open}
+      >
+        <span className="flex items-center gap-2 font-semibold">
+          <span className="inline-flex h-6 w-6 items-center justify-center rounded-md border border-[var(--line)] text-base leading-none">
+            {open ? "−" : "+"}
+          </span>
+          {title}
+        </span>
+        {hint ? (
+          <span className="truncate text-xs text-[var(--muted)]">{hint}</span>
+        ) : null}
+      </button>
+      {open ? <div className="pb-3">{children}</div> : null}
+    </div>
+  );
+}
+
 export function CheckoutForm() {
   if (CLERK_ENABLED) return <CheckoutFormAuthed />;
   return <CheckoutFormBase authHeaders={{}} signedIn={false} />;
@@ -90,11 +127,27 @@ function CheckoutFormBase({
   const [tableId, setTable] = useState(getTableId() || "");
   const [guestName, setGuestName] = useState("");
   const [guestEmail, setGuestEmail] = useState("");
+  const [note, setNote] = useState("");
+  const [couponCode, setCouponCode] = useState("");
+  const [appliedCoupon, setAppliedCoupon] = useState<{
+    code: string;
+    percentOff: number;
+    discountNzd: number;
+    allowWithRewards: boolean;
+    applyOn: RedeemOn;
+    minSpendNzd: number;
+    maxDiscountNzd: number | null;
+    message: string;
+  } | null>(null);
+  const [couponBusy, setCouponBusy] = useState(false);
   const [busy, setBusy] = useState(false);
   const [rewardsOn, setRewardsOn] = useState(false);
   const [myRewards, setMyRewards] = useState<MyRewards | null>(null);
   const [redeemPoints, setRedeemPoints] = useState(false);
   const [redeemStampMenuId, setRedeemStampMenuId] = useState("");
+  const [showRewards, setShowRewards] = useState(false);
+  const [showCoupon, setShowCoupon] = useState(false);
+  const [showNote, setShowNote] = useState(false);
 
   useEffect(() => {
     gql<{ tables: { id: string; name: string; isActive: boolean }[] }>(
@@ -113,6 +166,13 @@ function CheckoutFormBase({
       .then((data) => setRewardsOn(data.rewardSettings.enabled))
       .catch(() => undefined);
   }, []);
+
+  useEffect(() => {
+    if (cart?.note) {
+      setNote(cart.note);
+      setShowNote(true);
+    }
+  }, [cart?.id, cart?.note]);
 
   useEffect(() => {
     if (!signedIn || !cart?.id) {
@@ -136,7 +196,11 @@ function CheckoutFormBase({
     setBusy(true);
     try {
       setTableId(tableId);
-      await gql(UPDATE_CART, { id: cart.id, tableId }, authHeaders);
+      await gql(
+        UPDATE_CART,
+        { id: cart.id, tableId, note: note.trim() },
+        authHeaders,
+      );
       const origin = window.location.origin;
       const data = await gql<{
         createCheckoutSession: { url: string | null; orderId: string };
@@ -147,6 +211,8 @@ function CheckoutFormBase({
           tableId,
           guestName,
           guestEmail,
+          note: note.trim() || null,
+          couponCode: appliedCoupon?.code || null,
           successUrl: `${origin}/success?session_id={CHECKOUT_SESSION_ID}`,
           cancelUrl: `${origin}/checkout`,
           redeemPoints: signedIn && redeemPoints ? true : false,
@@ -174,6 +240,73 @@ function CheckoutFormBase({
     }
   }
 
+  async function previewAndApply(code: string, silent = false) {
+    if (!cart?.id) return;
+    const trimmed = code.trim();
+    if (!trimmed) {
+      if (!silent) toast.error("Enter a coupon code");
+      return;
+    }
+    setCouponBusy(true);
+    try {
+      const data = await gql<{
+        previewCoupon: {
+          valid: boolean;
+          message: string;
+          code: string;
+          percentOff: number;
+          discountNzd: number;
+          allowWithRewards: boolean;
+          applyOn: RedeemOn;
+          minSpendNzd: number;
+          maxDiscountNzd: number | null;
+        };
+      }>(
+        PREVIEW_COUPON,
+        {
+          code: trimmed,
+          cartId: cart.id,
+          redeemPoints: signedIn && redeemPoints ? true : false,
+          redeemStampMenuId:
+            signedIn && redeemStampMenuId && myRewards?.preview?.canRedeemStamp
+              ? redeemStampMenuId
+              : null,
+        },
+        authHeaders,
+      );
+      const preview = data.previewCoupon;
+      if (!preview.valid) {
+        setAppliedCoupon(null);
+        toast.error(preview.message);
+        return;
+      }
+      setAppliedCoupon({
+        code: preview.code,
+        percentOff: preview.percentOff,
+        discountNzd: preview.discountNzd,
+        allowWithRewards: preview.allowWithRewards,
+        applyOn: preview.applyOn || "BOTH",
+        minSpendNzd: preview.minSpendNzd || 0,
+        maxDiscountNzd: preview.maxDiscountNzd,
+        message: preview.message,
+      });
+      setCouponCode(preview.code);
+      setShowCoupon(true);
+      if (!silent) toast.success(preview.message);
+    } catch (err: any) {
+      setAppliedCoupon(null);
+      toast.error(err.message || "Could not apply coupon");
+    } finally {
+      setCouponBusy(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!appliedCoupon) return;
+    previewAndApply(appliedCoupon.code, true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [redeemPoints, redeemStampMenuId]);
+
   const items = cart?.items || [];
   const total = cartTotal(items);
   const preview = myRewards?.preview;
@@ -187,7 +320,11 @@ function CheckoutFormBase({
     (m) => m.id === redeemStampMenuId,
   );
   const settings = myRewards?.settings;
-  const displayTotal = Math.max(0, total - discount - stampDiscount);
+  const couponDiscount = appliedCoupon?.discountNzd || 0;
+  const displayTotal = Math.max(
+    0,
+    total - discount - stampDiscount - couponDiscount,
+  );
 
   return (
     <div className="grid gap-4 pb-32 sm:gap-6 lg:grid-cols-2">
@@ -219,24 +356,60 @@ function CheckoutFormBase({
             setGuestEmail={setGuestEmail}
           />
         </Card>
+      </div>
 
-        {rewardsOn && !signedIn ? (
-          <Card className="surface-card border-none p-4 sm:p-5">
-            <h2 className="mb-2 font-bold">Rewards</h2>
-            <p className="text-sm text-[var(--muted)]">
-              Sign in to earn and redeem points and stamps. Guest checkout does
-              not earn rewards.
-            </p>
-          </Card>
+      <Card className="surface-card h-fit border-none p-4 sm:p-5">
+        <h2 className="mb-4 font-bold">Order summary</h2>
+        <div className="space-y-2 text-sm">
+          {items.map((item) => (
+            <div key={item.id} className="flex justify-between gap-3">
+              <span>
+                {item.combo?.name || item.menu?.name} × {item.quantity}
+              </span>
+              <span>{money(Number(item.salePrice) * item.quantity)}</span>
+            </div>
+          ))}
+        </div>
+        {discount > 0 ? (
+          <div className="mt-3 flex justify-between text-sm text-[var(--muted)]">
+            <span>Points</span>
+            <span>−{money(discount)}</span>
+          </div>
         ) : null}
+        {stampDiscount > 0 ? (
+          <div className="mt-2 flex justify-between text-sm text-[var(--muted)]">
+            <span>Stamp</span>
+            <span>−{money(stampDiscount)}</span>
+          </div>
+        ) : null}
+        {couponDiscount > 0 ? (
+          <div className="mt-2 flex justify-between text-sm text-[var(--muted)]">
+            <span>
+              Coupon {appliedCoupon?.code}
+              {appliedCoupon && appliedCoupon.applyOn !== "BOTH"
+                ? ` (${redeemLabel(appliedCoupon.applyOn)} only)`
+                : ""}
+              {appliedCoupon?.maxDiscountNzd != null
+                ? ` · up to ${money(appliedCoupon.maxDiscountNzd)}`
+                : ""}
+            </span>
+            <span>−{money(couponDiscount)}</span>
+          </div>
+        ) : null}
+        <div className="mt-4 flex justify-between border-t border-[var(--line)] pt-4 text-lg">
+          <span>Total</span>
+          <span className="font-extrabold">{money(displayTotal)}</span>
+        </div>
 
-        {signedIn && settings?.enabled ? (
-          <Card className="surface-card border-none p-4 sm:p-5">
-            <h2 className="mb-2 font-bold">Rewards</h2>
+        {rewardsOn && signedIn && settings?.enabled ? (
+          <CheckoutExtra
+            title="Rewards"
+            hint={`${myRewards?.pointsBalance || 0} pts · ${myRewards?.stampsBalance || 0} stamps`}
+            open={showRewards}
+            onToggle={() => setShowRewards((v) => !v)}
+          >
             <p className="mb-3 text-sm text-[var(--muted)]">
-              {myRewards?.pointsBalance || 0} points ·{" "}
-              {myRewards?.stampsBalance || 0} stamps. Applies to{" "}
-              {redeemLabel(settings.redeemOn)}.
+              Applies to {redeemLabel(settings.redeemOn)}.
             </p>
             {preview && preview.pointsToSpend > 0 ? (
               <label className="mb-3 flex items-start gap-2 text-sm">
@@ -298,40 +471,102 @@ function CheckoutFormBase({
             >
               View rewards
             </Link>
-          </Card>
+          </CheckoutExtra>
+        ) : rewardsOn && !signedIn ? (
+          <CheckoutExtra
+            title="Rewards"
+            hint="Sign in to redeem"
+            open={showRewards}
+            onToggle={() => setShowRewards((v) => !v)}
+          >
+            <p className="text-sm text-[var(--muted)]">
+              Sign in to earn and redeem points and stamps. Guest checkout does
+              not earn rewards.
+            </p>
+          </CheckoutExtra>
         ) : null}
-      </div>
 
-      <Card className="surface-card h-fit border-none p-4 sm:p-5">
-        <h2 className="mb-4 font-bold">Order summary</h2>
-        <div className="space-y-2 text-sm">
-          {items.map((item) => (
-            <div key={item.id} className="flex justify-between gap-3">
-              <span>
-                {item.combo?.name || item.menu?.name} × {item.quantity}
-              </span>
-              <span>{money(Number(item.salePrice) * item.quantity)}</span>
+        <CheckoutExtra
+          title="Coupon"
+          hint={appliedCoupon?.code}
+          open={showCoupon}
+          onToggle={() => setShowCoupon((v) => !v)}
+        >
+          <p className="mb-3 text-sm text-[var(--muted)]">
+            Have a promo code? Apply it before you pay.
+          </p>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <input
+              className="input uppercase"
+              placeholder="CODE"
+              value={couponCode}
+              onChange={(e) => setCouponCode(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") previewAndApply(couponCode);
+              }}
+            />
+            <button
+              type="button"
+              className="btn btn-secondary shrink-0"
+              disabled={couponBusy}
+              onClick={() => previewAndApply(couponCode)}
+            >
+              {couponBusy ? "Checking…" : "Apply"}
+            </button>
+          </div>
+          {appliedCoupon ? (
+            <div className="mt-3 space-y-1">
+              <div className="flex items-start justify-between gap-3 text-sm">
+                <span>
+                  {appliedCoupon.code} · {appliedCoupon.message} (−
+                  {money(appliedCoupon.discountNzd)})
+                </span>
+                <button
+                  type="button"
+                  className="text-xs font-semibold text-[var(--muted)] underline"
+                  onClick={() => {
+                    setAppliedCoupon(null);
+                    setCouponCode("");
+                  }}
+                >
+                  Remove
+                </button>
+              </div>
+              {appliedCoupon.applyOn !== "BOTH" ? (
+                <p className="text-xs text-[var(--muted)]">
+                  Discount, min spend, and the up-to cap apply to{" "}
+                  {redeemLabel(appliedCoupon.applyOn)} items only. Other items
+                  stay full price.
+                </p>
+              ) : appliedCoupon.minSpendNzd > 0 ||
+                appliedCoupon.maxDiscountNzd != null ? (
+                <p className="text-xs text-[var(--muted)]">
+                  Min spend and the up-to cap apply to the whole order.
+                </p>
+              ) : null}
             </div>
-          ))}
-        </div>
-        {discount > 0 ? (
-          <div className="mt-3 flex justify-between text-sm text-[var(--muted)]">
-            <span>Points</span>
-            <span>−{money(discount)}</span>
-          </div>
-        ) : null}
-        {stampDiscount > 0 ? (
-          <div className="mt-2 flex justify-between text-sm text-[var(--muted)]">
-            <span>Stamp</span>
-            <span>−{money(stampDiscount)}</span>
-          </div>
-        ) : null}
-        <div className="mt-4 flex justify-between border-t border-[var(--line)] pt-4 text-lg">
-          <span>Total</span>
-          <span className="font-extrabold">{money(displayTotal)}</span>
-        </div>
+          ) : null}
+        </CheckoutExtra>
+
+        <CheckoutExtra
+          title="Kitchen note"
+          hint={note.trim() ? "Added" : undefined}
+          open={showNote}
+          onToggle={() => setShowNote((v) => !v)}
+        >
+          <p className="mb-3 text-sm text-[var(--muted)]">
+            Allergies, special requirements, or a note for the chef.
+          </p>
+          <textarea
+            className="input min-h-28"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="e.g. No peanuts, extra spicy, cutlery for a child…"
+          />
+        </CheckoutExtra>
+
         <Button
-          className="mt-5 min-h-12 w-full bg-[var(--brand)] font-bold text-white"
+          className="mt-4 min-h-12 w-full bg-[var(--brand)] font-bold text-white"
           isDisabled={busy || items.length === 0}
           onPress={pay}
         >

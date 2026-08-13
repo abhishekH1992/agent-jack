@@ -319,6 +319,8 @@ export const CHECKOUT = `
     $tableId: ID
     $guestName: String
     $guestEmail: String
+    $note: String
+    $couponCode: String
     $successUrl: String!
     $cancelUrl: String!
     $redeemPoints: Boolean
@@ -329,6 +331,8 @@ export const CHECKOUT = `
       tableId: $tableId
       guestName: $guestName
       guestEmail: $guestEmail
+      note: $note
+      couponCode: $couponCode
       successUrl: $successUrl
       cancelUrl: $cancelUrl
       redeemPoints: $redeemPoints
@@ -350,6 +354,8 @@ export const ORDERS_QUERY = `
     orders(limit: 500, userId: $userId) {
       id orderNumber status totalAmount guestName guestEmail note createdAt
       pointsEarned stampsEarned stampRedeemed pointsRedeemed pointsDiscountNzd
+      couponCode couponDiscountNzd
+      coupon { id code percentOff }
       table { id name }
       user { id name email }
       stampMenu { id name }
@@ -372,6 +378,8 @@ export const ORDER_QUERY = `
     order(id: $id) {
       id orderNumber status totalAmount guestName guestEmail note createdAt
       pointsEarned stampsEarned stampRedeemed pointsRedeemed pointsDiscountNzd
+      couponCode couponDiscountNzd
+      coupon { id code percentOff }
       table { id name }
       user { id name email }
       stampMenu { id name }
@@ -394,6 +402,8 @@ export const MY_ORDERS_QUERY = `
     myOrders(limit: 50) {
       id orderNumber status totalAmount guestName guestEmail note createdAt
       pointsRedeemed pointsDiscountNzd stampRedeemed pointsEarned stampsEarned
+      couponCode couponDiscountNzd
+      coupon { id code percentOff }
       table { id name }
       stampMenu { id name }
       items {
@@ -430,6 +440,12 @@ export const ADMIN_FORCE = `
 export const STORE_TABLE = `
   mutation StoreTable($input: TableInput!) {
     storeTable(input: $input) { id name isActive }
+  }
+`;
+
+export const UPDATE_TABLE = `
+  mutation UpdateTable($id: ID!, $input: TableInput!) {
+    updateTable(id: $id, input: $input) { id name isActive }
   }
 `;
 
@@ -534,6 +550,67 @@ export const ADMIN_USER_QUERY = `
       ledger {
         id orderId type pointsDelta stampsDelta note createdAt
       }
+    }
+  }
+`;
+
+export const TABLE_REVENUE_QUERY = `
+  query TableRevenue($days: Int) {
+    tableRevenue(days: $days) {
+      tableId tableName orderCount revenue
+    }
+  }
+`;
+
+export const COUPONS_QUERY = `
+  query Coupons {
+    coupons {
+      id code percentOff minSpendNzd maxDiscountNzd
+      startsAt expiresAt allowWithRewards applyOn isActive createdAt
+    }
+  }
+`;
+
+export const STORE_COUPON = `
+  mutation StoreCoupon($input: CouponInput!) {
+    storeCoupon(input: $input) {
+      id code percentOff minSpendNzd maxDiscountNzd
+      startsAt expiresAt allowWithRewards applyOn isActive
+    }
+  }
+`;
+
+export const UPDATE_COUPON = `
+  mutation UpdateCoupon($id: ID!, $input: CouponInput!) {
+    updateCoupon(id: $id, input: $input) {
+      id code percentOff minSpendNzd maxDiscountNzd
+      startsAt expiresAt allowWithRewards applyOn isActive
+    }
+  }
+`;
+
+export const DELETE_COUPON = `
+  mutation DeleteCoupon($id: ID!) {
+    deleteCoupon(id: $id)
+  }
+`;
+
+export const PREVIEW_COUPON = `
+  query PreviewCoupon(
+    $code: String!
+    $cartId: ID!
+    $redeemPoints: Boolean
+    $redeemStampMenuId: ID
+  ) {
+    previewCoupon(
+      code: $code
+      cartId: $cartId
+      redeemPoints: $redeemPoints
+      redeemStampMenuId: $redeemStampMenuId
+    ) {
+      valid message code percentOff discountNzd
+      minSpendNzd maxDiscountNzd allowWithRewards
+      applyOn qualifyingSubtotal
     }
   }
 `;

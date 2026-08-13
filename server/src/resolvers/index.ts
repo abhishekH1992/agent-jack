@@ -4,6 +4,11 @@ import { GraphQLContext, requireAdmin, requireUser } from "../context.js";
 import { generateBidChatReply } from "../services/openai.js";
 import { adminForcePrice } from "../services/pricing.js";
 import { createCheckoutSession } from "../services/stripe.js";
+import { previewCouponQuote } from "../services/checkout-quote.js";
+import {
+  couponWriteData,
+  mapCoupon,
+} from "../services/coupons.js";
 import {
   adminApplyStamp,
   getMyRewards,
@@ -31,12 +36,41 @@ import {
   syncMenuOptions,
 } from "./helpers.js";
 
+function parseDateTimeValue(value: unknown): Date | null {
+  if (value == null || value === "") return null;
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) throw new Error("Invalid date");
+    return value;
+  }
+  const raw = String(value).trim();
+  if (!raw) return null;
+  const local = raw.match(
+    /^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2})(?::(\d{2})(?:\.(\d+))?)?)?$/,
+  );
+  if (local) {
+    const date = new Date(
+      Number(local[1]),
+      Number(local[2]) - 1,
+      Number(local[3]),
+      Number(local[4] || 0),
+      Number(local[5] || 0),
+      Number(local[6] || 0),
+      local[7] ? Number(String(local[7]).padEnd(3, "0").slice(0, 3)) : 0,
+    );
+    if (Number.isNaN(date.getTime())) throw new Error("Invalid date");
+    return date;
+  }
+  const date = new Date(raw);
+  if (Number.isNaN(date.getTime())) throw new Error("Invalid date");
+  return date;
+}
+
 const DateTime = new GraphQLScalarType({
   name: "DateTime",
   serialize: (v) => (v instanceof Date ? v.toISOString() : v),
-  parseValue: (v) => new Date(v as string),
+  parseValue: parseDateTimeValue,
   parseLiteral: (ast) =>
-    ast.kind === Kind.STRING ? new Date(ast.value) : null,
+    ast.kind === Kind.STRING ? parseDateTimeValue(ast.value) : null,
 });
 
 function mapOrder(o: any, stampCtx?: Awaited<ReturnType<typeof getStampCtx>>) {
@@ -45,6 +79,9 @@ function mapOrder(o: any, stampCtx?: Awaited<ReturnType<typeof getStampCtx>>) {
     totalAmount: Number(o.totalAmount),
     pointsRedeemed: Number(o.pointsRedeemed || 0),
     pointsDiscountNzd: Number(o.pointsDiscountNzd || 0),
+    coupon: o.coupon ? mapCoupon(o.coupon) : null,
+    couponCode: o.couponCode || o.coupon?.code || null,
+    couponDiscountNzd: Number(o.couponDiscountNzd || 0),
     stampRedeemed: Boolean(o.stampRedeemed),
     pointsEarned: Number(o.pointsEarned || 0),
     stampsEarned: Number(o.stampsEarned || 0),
@@ -313,6 +350,7 @@ export const resolvers = {
         include: {
           table: true,
           stampMenu: true,
+          coupon: true,
           items: {
             include: { menu: true, menuVariant: true, combo: true },
           },
@@ -368,6 +406,73 @@ export const resolvers = {
       });
       if (!user) return null;
       return mapAdminUser(user, settings.stampsRequired);
+    },
+    coupons: async (_: unknown, __: unknown, ctx: GraphQLContext) => {
+      requireAdmin(ctx);
+      const rows = await prisma.coupon.findMany({
+        orderBy: { createdAt: "desc" },
+      });
+      return rows.map(mapCoupon);
+    },
+    coupon: async (_: unknown, { id }: { id: string }, ctx: GraphQLContext) => {
+      requireAdmin(ctx);
+      const row = await prisma.coupon.findUnique({ where: { id } });
+      return row ? mapCoupon(row) : null;
+    },
+    previewCoupon: async (
+      _: unknown,
+      args: {
+        code: string;
+        cartId: string;
+        redeemPoints?: boolean | null;
+        redeemStampMenuId?: string | null;
+      },
+      ctx: GraphQLContext,
+    ) => {
+      return previewCouponQuote({
+        cartId: args.cartId,
+        couponCode: args.code,
+        redeemPoints: args.redeemPoints,
+        redeemStampMenuId: args.redeemStampMenuId,
+        userId: ctx.user?.id,
+      });
+    },
+    tableRevenue: async (
+      _: unknown,
+      { days }: { days?: number | null },
+      ctx: GraphQLContext,
+    ) => {
+      requireAdmin(ctx);
+      const since =
+        days && days > 0
+          ? new Date(Date.now() - days * 24 * 60 * 60 * 1000)
+          : null;
+      const grouped = await prisma.order.groupBy({
+        by: ["tableId"],
+        where: {
+          status: { in: ["PAID", "FULFILLED"] },
+          tableId: { not: null },
+          ...(since ? { createdAt: { gte: since } } : {}),
+        },
+        _sum: { totalAmount: true },
+        _count: { _all: true },
+      });
+      const tableIds = grouped
+        .map((row) => row.tableId)
+        .filter((id): id is string => Boolean(id));
+      const tables = tableIds.length
+        ? await prisma.table.findMany({ where: { id: { in: tableIds } } })
+        : [];
+      const names = new Map(tables.map((t) => [t.id, t.name]));
+      return grouped
+        .filter((row) => row.tableId)
+        .map((row) => ({
+          tableId: row.tableId as string,
+          tableName: names.get(row.tableId as string) || "Table",
+          orderCount: row._count._all,
+          revenue: Number(row._sum.totalAmount || 0),
+        }))
+        .sort((a, b) => b.revenue - a.revenue);
     },
   },
 
@@ -557,6 +662,8 @@ export const resolvers = {
         tableId?: string;
         guestName?: string;
         guestEmail?: string;
+        note?: string | null;
+        couponCode?: string | null;
         successUrl: string;
         cancelUrl: string;
         redeemPoints?: boolean | null;
@@ -959,6 +1066,48 @@ export const resolvers = {
         include: rewardSettingsInclude,
       });
       return mapRewardSettings(updated);
+    },
+    storeCoupon: async (
+      _: unknown,
+      { input }: { input: any },
+      ctx: GraphQLContext,
+    ) => {
+      requireAdmin(ctx);
+      try {
+        return mapCoupon(
+          await prisma.coupon.create({ data: couponWriteData(input) }),
+        );
+      } catch (err: any) {
+        if (err?.code === "P2002") throw new Error("That coupon code already exists");
+        throw err;
+      }
+    },
+    updateCoupon: async (
+      _: unknown,
+      { id, input }: { id: string; input: any },
+      ctx: GraphQLContext,
+    ) => {
+      requireAdmin(ctx);
+      try {
+        return mapCoupon(
+          await prisma.coupon.update({
+            where: { id },
+            data: couponWriteData(input),
+          }),
+        );
+      } catch (err: any) {
+        if (err?.code === "P2002") throw new Error("That coupon code already exists");
+        throw err;
+      }
+    },
+    deleteCoupon: async (
+      _: unknown,
+      { id }: { id: string },
+      ctx: GraphQLContext,
+    ) => {
+      requireAdmin(ctx);
+      await prisma.coupon.delete({ where: { id } });
+      return true;
     },
     updateOrderStatus: async (
       _: unknown,

@@ -27,6 +27,22 @@ model Table {
   updatedAt DateTime @updatedAt
 }
 
+model Coupon {
+  id               String    @id @default(cuid())
+  code             String    @unique
+  percentOff       Decimal   @db.Decimal(5, 2)
+  minSpendNzd      Decimal   @default(0) @db.Decimal(10, 2)
+  maxDiscountNzd   Decimal?  @db.Decimal(10, 2)
+  startsAt         DateTime?
+  expiresAt        DateTime?
+  allowWithRewards Boolean   @default(false)
+  applyOn          RewardRedeemOn @default(BOTH)
+  isActive         Boolean   @default(true)
+  orders           Order[]
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+}
+
 model CategoryType {
   id         String     @id @default(cuid())
   name       String     @unique
@@ -313,6 +329,10 @@ model Order {
   totalAmount        Decimal         @db.Decimal(10, 2) @default(0)
   pointsRedeemed     Int             @default(0)
   pointsDiscountNzd  Decimal         @db.Decimal(10, 2) @default(0)
+  couponId           String?
+  coupon             Coupon?         @relation(fields: [couponId], references: [id], onDelete: SetNull)
+  couponCode         String?
+  couponDiscountNzd  Decimal         @db.Decimal(10, 2) @default(0)
   stampRedeemed      Boolean         @default(false)
   stampMenuId        String?
   stampMenu          Menu?           @relation("OrderStampMenu", fields: [stampMenuId], references: [id], onDelete: SetNull)

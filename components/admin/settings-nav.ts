@@ -1,5 +1,6 @@
 export const SETTINGS_LINKS = [
   { href: "/admin/settings", label: "Site Settings" },
+  { href: "/admin/settings/tables", label: "Tables" },
   { href: "/admin/settings/rewards", label: "Rewards" },
   { href: "/admin/settings/coupons", label: "Coupons" },
   { href: "/admin/settings/profile", label: "Profile Settings" },
