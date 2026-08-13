@@ -628,6 +628,14 @@ export const TABLE_REVENUE_QUERY = `
   }
 `;
 
+export const SALES_SUMMARY_QUERY = `
+  query SalesSummary {
+    salesSummary {
+      lifetimeNzd weekNzd priorWeekNzd
+    }
+  }
+`;
+
 export const COUPONS_QUERY = `
   query Coupons {
     coupons {

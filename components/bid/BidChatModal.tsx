@@ -253,7 +253,7 @@ export function BidChatModal({
         setLiveOffer(null);
         await refresh();
 
-        if (mode === "buyNow") {
+        if (mode === "buyNow" || mode === "offer") {
           toast.success(`Added ${qty} × ${menu.name} at ${money(amount)}`);
           onClose();
           return;
