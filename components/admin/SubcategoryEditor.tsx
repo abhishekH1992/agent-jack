@@ -11,6 +11,7 @@ import {
   UPDATE_SUBCATEGORY,
 } from "@/lib/queries";
 import { ImageUploadField } from "@/components/admin/ImageUploadField";
+import { IMAGE_SIZE_HINTS } from "@/lib/image-sizes";
 
 type Form = {
   name: string;
@@ -186,6 +187,7 @@ export function SubcategoryEditor({
         <ImageUploadField
           value={form.image}
           onChange={(image) => setForm({ ...form, image })}
+          hint={IMAGE_SIZE_HINTS.subcategory}
         />
 
         <label className="flex min-h-11 cursor-pointer items-center gap-3">

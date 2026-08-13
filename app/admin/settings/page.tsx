@@ -6,6 +6,7 @@ import toast from "react-hot-toast";
 import { adminGql } from "@/lib/admin";
 import { SITE_QUERY, UPDATE_SITE } from "@/lib/queries";
 import { ImageUploadField } from "@/components/admin/ImageUploadField";
+import { IMAGE_SIZE_HINTS } from "@/lib/image-sizes";
 
 const SETTING_SECTIONS = [
   {
@@ -88,7 +89,12 @@ export default function AdminSettingsPage() {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
         />
-        <ImageUploadField label="Logo" value={logo} onChange={setLogo} />
+        <ImageUploadField
+          label="Logo"
+          value={logo}
+          onChange={setLogo}
+          hint={IMAGE_SIZE_HINTS.logo}
+        />
 
         <button
           className="btn btn-primary w-full"

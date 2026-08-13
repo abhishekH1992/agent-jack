@@ -4,6 +4,7 @@ import { ImageUploadField } from "@/components/admin/ImageUploadField";
 import { SortableList } from "@/components/admin/SortableList";
 import { uploadAdminFiles } from "@/lib/admin-upload";
 import type { BannerSlide } from "@/lib/banner-copy";
+import { IMAGE_SIZE_HINTS } from "@/lib/image-sizes";
 import {
   menuCategoryHref,
   menuSubcategoryHref,
@@ -237,6 +238,7 @@ export function ImageBlockFields({
           value=""
           folder="banners"
           showPreview={false}
+          hint={isBanner ? IMAGE_SIZE_HINTS.banner : IMAGE_SIZE_HINTS.page}
           onChange={() => undefined}
           onFiles={async (files) => {
             const file = files[0];

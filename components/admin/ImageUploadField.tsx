@@ -12,6 +12,7 @@ export function ImageUploadField({
   multiple = false,
   showPreview = true,
   allowClear = true,
+  hint,
   onFiles,
 }: {
   label?: string;
@@ -21,6 +22,7 @@ export function ImageUploadField({
   multiple?: boolean;
   showPreview?: boolean;
   allowClear?: boolean;
+  hint?: string;
   onFiles?: (files: File[]) => Promise<void> | void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -105,6 +107,7 @@ export function ImageUploadField({
           </p>
         )
       ) : null}
+      {hint ? <p className="text-xs leading-5 text-[var(--muted)]">{hint}</p> : null}
     </div>
   );
 }

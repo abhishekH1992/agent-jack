@@ -302,6 +302,361 @@ const menuTree: CatSeed[] = [
   },
 ];
 
+const CUSTOMERS = [
+  { name: "Aria Patel", email: "aria.patel@example.com" },
+  { name: "Liam Chen", email: "liam.chen@example.com" },
+  { name: "Sophie Williams", email: "sophie.williams@example.com" },
+  { name: "Noah Singh", email: "noah.singh@example.com" },
+  { name: "Mia Thompson", email: "mia.thompson@example.com" },
+  { name: "Jack Morrison", email: "jack.morrison@example.com" },
+  { name: "Olivia Kumar", email: "olivia.kumar@example.com" },
+  { name: "Ethan Baker", email: "ethan.baker@example.com" },
+  { name: "Isla Nguyen", email: "isla.nguyen@example.com" },
+  { name: "Lucas Fraser", email: "lucas.fraser@example.com" },
+];
+
+const KITCHEN_NOTES = [
+  "No peanuts",
+  "Extra spicy",
+  "Cutlery for a child",
+  "Allergy: gluten — no wheat bun",
+  "No ice in drinks",
+  "Well done on the burger",
+];
+
+function pick<T>(arr: T[]): T {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
+function chance(p: number) {
+  return Math.random() < p;
+}
+
+function round2(n: number) {
+  return Math.round(n * 100) / 100;
+}
+
+function randomPastDate(maxDays: number) {
+  const d = new Date();
+  d.setDate(d.getDate() - Math.floor(Math.random() * maxDays));
+  d.setHours(11 + Math.floor(Math.random() * 10), Math.floor(Math.random() * 60), 0, 0);
+  return d;
+}
+
+async function seedCustomersAndHistory(coffeeStampIds: string[]) {
+  const stampSet = new Set(coffeeStampIds);
+
+  const coupons = await Promise.all([
+    prisma.coupon.create({
+      data: {
+        code: "JACK10",
+        percentOff: 10,
+        minSpendNzd: 50,
+        maxDiscountNzd: 15,
+        allowWithRewards: false,
+        applyOn: "FOOD",
+        isActive: true,
+      },
+    }),
+    prisma.coupon.create({
+      data: {
+        code: "JACK15",
+        percentOff: 15,
+        minSpendNzd: 30,
+        maxDiscountNzd: 20,
+        allowWithRewards: true,
+        applyOn: "BOTH",
+        isActive: true,
+      },
+    }),
+    prisma.coupon.create({
+      data: {
+        code: "PINT10",
+        percentOff: 10,
+        minSpendNzd: 12,
+        maxDiscountNzd: 8,
+        allowWithRewards: true,
+        applyOn: "LIQUOR",
+        isActive: true,
+      },
+    }),
+    prisma.coupon.create({
+      data: {
+        code: "WELCOME",
+        percentOff: 10,
+        minSpendNzd: 0,
+        maxDiscountNzd: 10,
+        allowWithRewards: true,
+        applyOn: "BOTH",
+        isActive: true,
+      },
+    }),
+  ]);
+
+  const tables = await prisma.table.findMany();
+  const menus = await prisma.menu.findMany({
+    include: {
+      addons: true,
+      variants: true,
+      subCategory: { include: { category: { include: { categoryType: true } } } },
+    },
+  });
+  const foodMenus = menus.filter(
+    (m) =>
+      (m.subCategory.category.categoryType?.name || "").toLowerCase() === "food",
+  );
+  const liquorMenus = menus.filter(
+    (m) =>
+      (m.subCategory.category.categoryType?.name || "").toLowerCase() ===
+      "liquor",
+  );
+  const stampMenus = menus.filter((m) => stampSet.has(m.id));
+
+  const users = [];
+  for (const customer of CUSTOMERS) {
+    const user = await prisma.user.create({
+      data: {
+        clerkId: `local-customer-${customer.email}`,
+        email: customer.email,
+        name: customer.name,
+        role: "customer",
+        reward: { create: { pointsBalance: 0, stampsBalance: 0 } },
+      },
+    });
+    users.push(user);
+  }
+
+  let orderSeq = 1;
+  let paidCount = 0;
+  let couponCount = 0;
+  let pointsRedeemCount = 0;
+  let stampRedeemCount = 0;
+
+  for (const user of users) {
+    let points = 0;
+    let stamps = 0;
+    const orderCount = 5 + Math.floor(Math.random() * 8);
+    const dates = Array.from({ length: orderCount }, () => randomPastDate(90)).sort(
+      (a, b) => a.getTime() - b.getTime(),
+    );
+
+    for (const createdAt of dates) {
+      const statusRoll = Math.random();
+      const status =
+        statusRoll < 0.72
+          ? "FULFILLED"
+          : statusRoll < 0.9
+            ? "PAID"
+            : statusRoll < 0.97
+              ? "CANCELLED"
+              : "PENDING";
+      const paid = status === "PAID" || status === "FULFILLED";
+
+      const lineCount = 1 + Math.floor(Math.random() * 4);
+      const includeStamp = stampMenus.length > 0 && chance(0.7);
+      const picked: typeof menus = [];
+      if (includeStamp) picked.push(pick(stampMenus));
+      while (picked.length < lineCount) {
+        const pool = chance(0.25) && liquorMenus.length ? liquorMenus : foodMenus;
+        picked.push(pick(pool.length ? pool : menus));
+      }
+
+      const lines = picked.map((menu) => {
+        const variant =
+          menu.variants.length && chance(0.45) ? pick(menu.variants) : null;
+        const addon =
+          menu.addons.length && chance(0.3) ? pick(menu.addons) : null;
+        const quantity = 1 + Math.floor(Math.random() * 2);
+        const salePrice = Number(variant?.price ?? menu.currentPrice ?? menu.fixedPrice);
+        return { menu, variant, addon, quantity, salePrice };
+      });
+
+      const catalogTotal = (applyOn: "FOOD" | "LIQUOR" | "BOTH") =>
+        round2(
+          lines.reduce((sum, line) => {
+            const type = (
+              line.menu.subCategory.category.categoryType?.name || ""
+            ).toLowerCase();
+            if (applyOn === "FOOD" && type !== "food") return sum;
+            if (applyOn === "LIQUOR" && type !== "liquor") return sum;
+            const unit = line.salePrice + Number(line.addon?.price || 0);
+            return sum + unit * line.quantity;
+          }, 0),
+        );
+
+      const subtotal = catalogTotal("BOTH");
+      let stampRedeemed = false;
+      let stampMenuId: string | null = null;
+      let stampFree = 0;
+      let pointsRedeemed = 0;
+      let pointsDiscountNzd = 0;
+      let coupon = null as (typeof coupons)[number] | null;
+      let couponDiscountNzd = 0;
+
+      if (paid) {
+        const stampLine = lines.find((l) => stampSet.has(l.menu.id));
+        if (stamps >= 9 && stampLine && chance(0.8)) {
+          stampRedeemed = true;
+          stampMenuId = stampLine.menu.id;
+          stampFree = stampLine.salePrice + Number(stampLine.addon?.price || 0);
+          stamps -= 9;
+          stampRedeemCount += 1;
+        }
+
+        if (points >= 100 && chance(0.4)) {
+          pointsRedeemed = 100;
+          pointsDiscountNzd = 5;
+          points -= 100;
+          pointsRedeemCount += 1;
+        }
+
+        const rewardsUsed = stampRedeemed || pointsRedeemed > 0;
+        if (chance(0.38)) {
+          const candidates = coupons.filter((c) => {
+            if (rewardsUsed && !c.allowWithRewards) return false;
+            const applyOn = c.applyOn as "FOOD" | "LIQUOR" | "BOTH";
+            const base = catalogTotal(applyOn);
+            return base >= Number(c.minSpendNzd) && base > 0;
+          });
+          if (candidates.length) {
+            coupon = pick(candidates);
+            const applyOn = coupon.applyOn as "FOOD" | "LIQUOR" | "BOTH";
+            const base = catalogTotal(applyOn);
+            const raw = round2((base * Number(coupon.percentOff)) / 100);
+            const cap =
+              coupon.maxDiscountNzd == null
+                ? raw
+                : Math.min(raw, Number(coupon.maxDiscountNzd));
+            const remaining = Math.max(0.5, subtotal - stampFree - pointsDiscountNzd);
+            couponDiscountNzd = round2(Math.min(cap, remaining - 0.5));
+            if (couponDiscountNzd > 0) couponCount += 1;
+            else {
+              coupon = null;
+              couponDiscountNzd = 0;
+            }
+          }
+        }
+      }
+
+      const totalAmount = round2(
+        Math.max(0.5, subtotal - stampFree - pointsDiscountNzd - couponDiscountNzd),
+      );
+      const orderNumber = `AJ-SEED-${String(orderSeq).padStart(5, "0")}`;
+      orderSeq += 1;
+
+      const stampsEarned = paid
+        ? lines.reduce((sum, line) => {
+            if (!stampSet.has(line.menu.id)) return sum;
+            let qty = line.quantity;
+            if (stampRedeemed && line.menu.id === stampMenuId) qty = Math.max(0, qty - 1);
+            return sum + qty;
+          }, 0)
+        : 0;
+      const pointsEarned = paid
+        ? Math.floor(Math.max(0, subtotal - stampFree - pointsDiscountNzd))
+        : 0;
+
+      const order = await prisma.order.create({
+        data: {
+          orderNumber,
+          note: chance(0.22) ? pick(KITCHEN_NOTES) : null,
+          tableId: tables.length ? pick(tables).id : null,
+          userId: user.id,
+          guestName: user.name,
+          guestEmail: user.email,
+          status,
+          totalAmount,
+          pointsRedeemed,
+          pointsDiscountNzd,
+          couponId: coupon?.id || null,
+          couponCode: coupon?.code || null,
+          couponDiscountNzd,
+          stampRedeemed,
+          stampMenuId,
+          pointsEarned,
+          stampsEarned,
+          createdAt,
+          updatedAt: createdAt,
+          items: {
+            create: lines.map((line) => ({
+              menuId: line.menu.id,
+              menuVariantId: line.variant?.id || null,
+              quantity: line.quantity,
+              salePrice: line.salePrice,
+              addons: line.addon
+                ? { create: [{ menuAddonId: line.addon.id }] }
+                : undefined,
+            })),
+          },
+        },
+      });
+
+      if (!paid) continue;
+      paidCount += 1;
+
+      if (pointsRedeemed > 0) {
+        await prisma.rewardLedger.create({
+          data: {
+            userId: user.id,
+            orderId: order.id,
+            type: "REDEEM_POINTS",
+            pointsDelta: -pointsRedeemed,
+            note: `Redeemed ${pointsRedeemed} points on ${orderNumber}`,
+            createdAt,
+          },
+        });
+      }
+      if (stampRedeemed) {
+        await prisma.rewardLedger.create({
+          data: {
+            userId: user.id,
+            orderId: order.id,
+            type: "REDEEM_STAMP",
+            stampsDelta: -9,
+            note: `Redeemed 9 stamps for 1 free item on ${orderNumber}`,
+            createdAt,
+          },
+        });
+      }
+      if (pointsEarned > 0) {
+        points += pointsEarned;
+        await prisma.rewardLedger.create({
+          data: {
+            userId: user.id,
+            orderId: order.id,
+            type: "EARN_POINTS",
+            pointsDelta: pointsEarned,
+            note: `Earned ${pointsEarned} points on ${orderNumber}`,
+            createdAt,
+          },
+        });
+      }
+      if (stampsEarned > 0) {
+        stamps += stampsEarned;
+        await prisma.rewardLedger.create({
+          data: {
+            userId: user.id,
+            orderId: order.id,
+            type: "EARN_STAMP",
+            stampsDelta: stampsEarned,
+            note: `Earned ${stampsEarned} stamp${stampsEarned === 1 ? "" : "s"} on ${orderNumber}`,
+            createdAt,
+          },
+        });
+      }
+
+      await prisma.userReward.update({
+        where: { userId: user.id },
+        data: { pointsBalance: points, stampsBalance: stamps },
+      });
+    }
+  }
+
+  console.log(
+    `Seeded ${users.length} customers, ${orderSeq - 1} orders (${paidCount} paid), ${couponCount} coupons, ${pointsRedeemCount} point redemptions, ${stampRedeemCount} stamp redemptions`,
+  );
+}
+
 async function main() {
   // Wipe
   await prisma.rewardLedger.deleteMany();
@@ -313,6 +668,7 @@ async function main() {
   await prisma.orderItemAddon.deleteMany();
   await prisma.orderItem.deleteMany();
   await prisma.order.deleteMany();
+  await prisma.coupon.deleteMany();
   await prisma.cartItemAddon.deleteMany();
   await prisma.cartItem.deleteMany();
   await prisma.cart.deleteMany();
@@ -735,6 +1091,8 @@ async function main() {
       },
     },
   });
+
+  await seedCustomersAndHistory(coffeeStampIds);
 
   console.log("Seed complete (pages + tmp images → public/uploads)");
 }

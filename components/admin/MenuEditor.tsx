@@ -13,6 +13,7 @@ import {
 } from "@/lib/queries";
 import { ImageUploadField } from "@/components/admin/ImageUploadField";
 import { TagInput } from "@/components/admin/TagInput";
+import { IMAGE_SIZE_HINTS } from "@/lib/image-sizes";
 
 type OptionRow = {
   key: string;
@@ -388,6 +389,7 @@ export function MenuEditor({ menuId }: { menuId?: string }) {
         <ImageUploadField
           value={form.image}
           onChange={(image) => setForm((f) => ({ ...f, image }))}
+          hint={IMAGE_SIZE_HINTS.menu}
         />
 
         <div className="grid grid-cols-2 gap-3">

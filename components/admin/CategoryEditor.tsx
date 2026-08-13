@@ -11,6 +11,7 @@ import {
   UPDATE_CATEGORY,
 } from "@/lib/queries";
 import { ImageUploadField } from "@/components/admin/ImageUploadField";
+import { IMAGE_SIZE_HINTS } from "@/lib/image-sizes";
 
 type Form = {
   name: string;
@@ -197,6 +198,7 @@ export function CategoryEditor({ categoryId }: { categoryId?: string }) {
         <ImageUploadField
           value={form.image}
           onChange={(image) => setForm({ ...form, image })}
+          hint={IMAGE_SIZE_HINTS.category}
         />
 
         <label className="flex min-h-11 cursor-pointer items-center gap-3">
