@@ -9,6 +9,7 @@ import { adminGql } from "@/lib/admin";
 import {
   DASHBOARD_ORDERS_QUERY,
   LIQUOR_MENUS,
+  SALES_SUMMARY_QUERY,
   TABLES_QUERY,
   TABLE_REVENUE_QUERY,
 } from "@/lib/queries";
@@ -27,6 +28,12 @@ type TableRevenue = {
   tableName: string;
   orderCount: number;
   revenue: number;
+};
+
+type SalesSummary = {
+  lifetimeNzd: number;
+  weekNzd: number;
+  priorWeekNzd: number;
 };
 
 type Order = {
@@ -231,11 +238,16 @@ export default function AdminDashboard() {
   const [tableCount, setTableCount] = useState(0);
   const [tableRevenueAll, setTableRevenueAll] = useState<TableRevenue[]>([]);
   const [tableRevenueWeek, setTableRevenueWeek] = useState<TableRevenue[]>([]);
+  const [sales, setSales] = useState<SalesSummary>({
+    lifetimeNzd: 0,
+    weekNzd: 0,
+    priorWeekNzd: 0,
+  });
   const [loadedAt, setLoadedAt] = useState<Date | null>(null);
   const [loading, setLoading] = useState(true);
 
   async function load() {
-    const [m, o, t, allTime, week] = await Promise.all([
+    const [m, o, t, allTime, week, summary] = await Promise.all([
       adminGql<{ menus: LiquorMenu[] }>(LIQUOR_MENUS),
       adminGql<{ orders: Order[] }>(DASHBOARD_ORDERS_QUERY),
       adminGql<{ tables: { id: string; isActive: boolean }[] }>(TABLES_QUERY),
@@ -243,12 +255,14 @@ export default function AdminDashboard() {
       adminGql<{ tableRevenue: TableRevenue[] }>(TABLE_REVENUE_QUERY, {
         days: 7,
       }),
+      adminGql<{ salesSummary: SalesSummary }>(SALES_SUMMARY_QUERY),
     ]);
     setMenus(m.menus);
     setOrders(o.orders);
     setTableCount(t.tables.filter((x) => x.isActive).length);
     setTableRevenueAll(allTime.tableRevenue);
     setTableRevenueWeek(week.tableRevenue);
+    setSales(summary.salesSummary);
     setLoadedAt(new Date());
     setLoading(false);
   }
@@ -279,9 +293,7 @@ export default function AdminDashboard() {
 
   const analytics = useMemo(() => {
     const now = new Date();
-    const todayStart = startOfDay(now);
     const weekStart = daysAgo(7);
-    const prevWeekStart = daysAgo(14);
 
     const todayOrders = orders.filter((o) =>
       isSameDay(new Date(o.createdAt), now),
@@ -289,10 +301,6 @@ export default function AdminDashboard() {
     const weekOrders = orders.filter(
       (o) => new Date(o.createdAt) >= weekStart,
     );
-    const prevWeekOrders = orders.filter((o) => {
-      const d = new Date(o.createdAt);
-      return d >= prevWeekStart && d < weekStart;
-    });
 
     const revenueOf = (list: Order[]) =>
       list
@@ -300,8 +308,8 @@ export default function AdminDashboard() {
         .reduce((sum, o) => sum + Number(o.totalAmount), 0);
 
     const todayRevenue = revenueOf(todayOrders);
-    const weekRevenue = revenueOf(weekOrders);
-    const prevWeekRevenue = revenueOf(prevWeekOrders);
+    const weekRevenue = sales.weekNzd;
+    const prevWeekRevenue = sales.priorWeekNzd;
     const weekDelta =
       prevWeekRevenue > 0
         ? ((weekRevenue - prevWeekRevenue) / prevWeekRevenue) * 100
@@ -373,7 +381,9 @@ export default function AdminDashboard() {
       pending,
       paidOpen,
       weekRevenue,
+      prevWeekRevenue,
       weekDelta,
+      lifetimeRevenue: sales.lifetimeNzd,
       byStatus,
       statusMax,
       topFood,
@@ -382,7 +392,7 @@ export default function AdminDashboard() {
       liquorPulse,
       recent: orders.slice(0, 8),
     };
-  }, [orders, menus]);
+  }, [orders, menus, sales]);
 
   return (
     <div className="space-y-6">
@@ -411,7 +421,7 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         <Kpi
           label="Today's sales"
           value={money(analytics.todayRevenue)}
@@ -434,12 +444,17 @@ export default function AdminDashboard() {
           }
         />
         <Kpi
+          label="Lifetime sales"
+          value={money(analytics.lifetimeRevenue)}
+          hint="Paid + fulfilled, all time"
+        />
+        <Kpi
           label="7-day sales"
           value={money(analytics.weekRevenue)}
           hint={
             analytics.weekDelta === 0
-              ? "vs prior week"
-              : `${analytics.weekDelta > 0 ? "+" : ""}${analytics.weekDelta.toFixed(0)}% vs prior week`
+              ? `vs prior week (${money(analytics.prevWeekRevenue)})`
+              : `${analytics.weekDelta > 0 ? "+" : ""}${analytics.weekDelta.toFixed(0)}% vs prior week (${money(analytics.prevWeekRevenue)})`
           }
         />
       </section>
